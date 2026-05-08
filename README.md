@@ -19,7 +19,7 @@ food-rag/
 │   ├── evaluator.py    # RAGAS-style eval metrics
 │   ├── filters.py      # NL query parser
 │   ├── hybrid_retriever.py  # BM25 + ChromaDB + RRF
-│   ├── query_transformer.py # Multi-query, HyDE, step-back, routing
+│   ├── query_transformer.py # Multi-query, step-back, routing
 │   ├── rag_pipeline.py # Pipeline orchestrator
 │   ├── reranker.py     # Cross-encoder + MMR
 │   ├── utils.py        # Shared helpers
@@ -42,7 +42,8 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-# Add your GOOGLE_API_KEY to .env
+ollama pull llama3.2:3b
+# Make sure Ollama is running before starting the app.
 ```
 
 ---
@@ -140,7 +141,7 @@ POST /recommend
 Query Router ──► CLARIFICATION / REJECTION / GENERATION
       │
       ▼
-Multi-Query Transform (4 variants + HyDE + step-back)
+Multi-Query Transform (4 variants + step-back)
       │
       ▼
 Hybrid Retrieval
@@ -161,5 +162,5 @@ Cross-encoder Reranker
   └── Layer 2: Cosine similarity ≥ 0.92
       │
       ▼
-Grounded Generation (Gemini)
+Grounded Generation (Ollama llama3.2:3b)
 ```

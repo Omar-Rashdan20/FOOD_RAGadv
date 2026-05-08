@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import logging
+import json
+import urllib.error
+import urllib.request
 from typing import Any
 
 from .cache import HybridCache, make_cache_key
@@ -26,45 +29,49 @@ from .vector_store import (
 logger = logging.getLogger(__name__)
 
 
-class GeminiClient:
+class OllamaClient:
     def __init__(
         self,
-        api_key: str | None,
+        base_url: str,
         model_name: str,
         max_output_tokens: int = 1024,
         temperature: float = 0.5,
+        timeout_seconds: int = 120,
     ) -> None:
-        self.api_key = api_key
+        self.base_url = base_url.rstrip("/")
         self.model_name = model_name
         self.max_output_tokens = max_output_tokens
         self.temperature = temperature
-        self._client: Any | None = None
-        self._types: Any | None = None
+        self.timeout_seconds = timeout_seconds
 
     def generate(self, prompt: str) -> str:
-        if not self.api_key:
+        payload = {
+            "model": self.model_name,
+            "prompt": prompt,
+            "stream": False,
+            "options": {
+                "temperature": self.temperature,
+                "num_predict": self.max_output_tokens,
+            },
+        }
+        request = urllib.request.Request(
+            f"{self.base_url}/api/generate",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout_seconds) as response:
+                data = json.loads(response.read().decode("utf-8"))
+        except urllib.error.URLError as exc:
             raise RuntimeError(
-                "GOOGLE_API_KEY is not set. Add it to .env before running."
-            )
-        client, genai_types = self._load_client()
-        config = genai_types.GenerateContentConfig(
-            max_output_tokens=self.max_output_tokens,
-            temperature=self.temperature,
-        )
-        response = client.models.generate_content(
-            model=self.model_name,
-            contents=prompt,
-            config=config,
-        )
-        return (response.text or "").strip()
+                "Ollama request failed. Make sure Ollama is running at "
+                f"{self.base_url} and the model is available: ollama pull {self.model_name}"
+            ) from exc
 
-    def _load_client(self) -> tuple[Any, Any]:
-        if self._client is None or self._types is None:
-            from google import genai
-            from google.genai import types
-            self._client = genai.Client(api_key=self.api_key)
-            self._types = types
-        return self._client, self._types
+        if data.get("error"):
+            raise RuntimeError(f"Ollama error: {data['error']}")
+        return str(data.get("response", "")).strip()
 
 
 class FoodRAGPipeline:
@@ -72,14 +79,14 @@ class FoodRAGPipeline:
         self,
         collection: Any,
         bm25_index: BM25Index,
-        gemini_client: GeminiClient,
+        llm_client: OllamaClient,
         cross_encoder: CrossEncoderReranker,
         cache: HybridCache,
         settings: Settings,
     ) -> None:
         self.collection = collection
         self.bm25_index = bm25_index
-        self.gemini_client = gemini_client
+        self.llm_client = llm_client
         self.cross_encoder = cross_encoder
         self.cache = cache
         self.settings = settings
@@ -105,9 +112,8 @@ class FoodRAGPipeline:
 
         transformed = transform_query(
             clean_query,
-            self.gemini_client,
+            self.llm_client,
             n_variants=4,
-            use_hyde=True,
             use_stepback=True,
         )
 
@@ -128,7 +134,7 @@ class FoodRAGPipeline:
                 f"Answer this food-related question:\n\n{clean_query}"
             )
             try:
-                return self.gemini_client.generate(prompt)
+                return self.llm_client.generate(prompt)
             except Exception as exc:
                 return f"Generation error: {exc}"
 
@@ -151,7 +157,7 @@ class FoodRAGPipeline:
         context = prepare_context(ranked, top_k=result_count)
         prompt = build_prompt(clean_query, context, filters, transformed)
         try:
-            response = self.gemini_client.generate(prompt)
+            response = self.llm_client.generate(prompt)
         except Exception as exc:
             return f"Generation error: {exc}"
 
@@ -307,17 +313,18 @@ def build_pipeline(
         semantic_threshold=0.92,
     )
 
-    gemini = GeminiClient(
-        api_key=app_settings.google_api_key,
-        model_name=app_settings.gemini_model_name,
+    llm_client = OllamaClient(
+        base_url=app_settings.ollama_base_url,
+        model_name=app_settings.ollama_model_name,
         max_output_tokens=app_settings.max_output_tokens,
         temperature=app_settings.temperature,
+        timeout_seconds=app_settings.ollama_timeout_seconds,
     )
 
     return FoodRAGPipeline(
         collection=collection,
         bm25_index=bm25,
-        gemini_client=gemini,
+        llm_client=llm_client,
         cross_encoder=cross_encoder or CrossEncoderReranker(),
         cache=cache,
         settings=app_settings,

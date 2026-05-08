@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import logging
+import json
+import re
 import statistics
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from .rag_pipeline import GeminiClient
+    from .rag_pipeline import FoodRAGPipeline
+    from .rag_pipeline import OllamaClient
 
 logger = logging.getLogger(__name__)
 
@@ -134,7 +137,8 @@ def evaluate_retrieval(samples: list[EvalSample], k: int = 10) -> RetrievalMetri
         hits_in_top_k = [r for r in retrieved if r in relevant]
 
         recalls.append(len(hits_in_top_k) / len(relevant))
-        precisions.append(len(hits_in_top_k) / k if k > 0 else 0.0)
+        judged_k = min(k, len(retrieved), len(relevant))
+        precisions.append(len(hits_in_top_k) / judged_k if judged_k > 0 else 0.0)
         hits.append(1.0 if hits_in_top_k else 0.0)
 
         rr = 0.0
@@ -158,7 +162,7 @@ def evaluate_retrieval(samples: list[EvalSample], k: int = 10) -> RetrievalMetri
 
 def evaluate_generation(
     samples: list[EvalSample],
-    gemini_client: "GeminiClient",
+    llm_client: "OllamaClient",
 ) -> GenerationMetrics:
     if not samples:
         return GenerationMetrics()
@@ -171,22 +175,12 @@ def evaluate_generation(
 
     for sample in samples:
         context_text = "\n\n".join(sample.retrieved_contexts[:5])
-
-        faithfulness_scores.append(_llm_score(gemini_client, _faithfulness_prompt(
-            sample.query, sample.generated_answer, context_text
-        )))
-        relevancy_scores.append(_llm_score(gemini_client, _relevancy_prompt(
-            sample.query, sample.generated_answer
-        )))
-        ctx_precision_scores.append(_llm_score(gemini_client, _context_precision_prompt(
-            sample.query, context_text
-        )))
-        ctx_recall_scores.append(_llm_score(gemini_client, _context_recall_prompt(
-            sample.ground_truth_answer, context_text
-        )))
-        correctness_scores.append(_llm_score(gemini_client, _correctness_prompt(
-            sample.query, sample.generated_answer, sample.ground_truth_answer
-        )))
+        scores = _llm_judge_scores(llm_client, sample, context_text)
+        faithfulness_scores.append(scores["faithfulness"])
+        relevancy_scores.append(scores["answer_relevancy"])
+        ctx_precision_scores.append(scores["context_precision"])
+        ctx_recall_scores.append(scores["context_recall"])
+        correctness_scores.append(scores["answer_correctness"])
 
     def safe_mean(lst: list[float]) -> float:
         return statistics.mean(lst) if lst else 0.0
@@ -202,11 +196,11 @@ def evaluate_generation(
 
 def run_full_eval(
     samples: list[EvalSample],
-    gemini_client: "GeminiClient",
+    llm_client: "OllamaClient",
     k: int = 10,
 ) -> EvalReport:
     retrieval = evaluate_retrieval(samples, k=k)
-    generation = evaluate_generation(samples, gemini_client)
+    generation = evaluate_generation(samples, llm_client)
     report = EvalReport(
         n_samples=len(samples),
         retrieval=retrieval,
@@ -216,65 +210,164 @@ def run_full_eval(
     return report
 
 
-def _llm_score(client: "GeminiClient", prompt: str) -> float:
+def build_eval_samples(
+    pipeline: "FoodRAGPipeline",
+    raw_samples: list[Any],
+    n_results: int = 10,
+) -> list[EvalSample]:
+    from .filters import parse_query
+    from .query_transformer import QueryRoute, transform_query
+    from .rag_pipeline import build_prompt, prepare_context
+    from .reranker import normalize_search_result, rerank_results
+
+    eval_samples: list[EvalSample] = []
+
+    for raw_sample in raw_samples:
+        query = str(_sample_value(raw_sample, "query", "")).strip()
+        if not query:
+            logger.warning("Skipping eval sample with empty query")
+            continue
+
+        ground_truth = str(_sample_value(raw_sample, "ground_truth_answer", ""))
+        raw_relevant_ids = _sample_value(raw_sample, "relevant_doc_ids", []) or []
+        relevant_doc_ids = [str(doc_id) for doc_id in raw_relevant_ids]
+
+        filters = parse_query(query)
+        transformed = transform_query(query, pipeline.llm_client)
+        retrieved_ids: list[str] = []
+        contexts: list[str] = []
+
+        if transformed.route == QueryRoute.RETRIEVAL:
+            raw_results = pipeline._retrieve_candidates(transformed, filters, n_results)
+            food_results = [normalize_search_result(result) for result in raw_results]
+            ranked = rerank_results(
+                food_results,
+                filters,
+                query=query,
+                cross_encoder=pipeline.cross_encoder,
+            )
+
+            top_ranked = ranked[:n_results]
+            retrieved_ids = [item.food_id for item in top_ranked]
+            contexts = [_eval_context(item) for item in top_ranked]
+            context = prepare_context(top_ranked, top_k=n_results)
+            prompt = build_prompt(query, context, filters, transformed)
+        elif transformed.route == QueryRoute.CLARIFICATION:
+            prompt = (
+                "Could you give me a bit more detail? For example: "
+                "what cuisine, dietary preference, or calorie range are you looking for?"
+            )
+        elif transformed.route == QueryRoute.REJECTION:
+            prompt = (
+                "I'm a food recommendation assistant. "
+                "I can help you find dishes, recipes, and nutrition information. "
+                "Please ask me something food-related!"
+            )
+        else:
+            prompt = (
+                f"You are a knowledgeable food assistant. "
+                f"Answer this food-related question:\n\n{query}"
+            )
+
+        if transformed.route in {QueryRoute.CLARIFICATION, QueryRoute.REJECTION}:
+            answer = prompt
+        else:
+            try:
+                answer = pipeline.llm_client.generate(prompt)
+            except Exception as exc:
+                answer = f"Generation error: {exc}"
+
+        eval_samples.append(EvalSample(
+            query=query,
+            ground_truth_answer=ground_truth,
+            relevant_doc_ids=relevant_doc_ids,
+            retrieved_doc_ids=retrieved_ids,
+            generated_answer=answer,
+            retrieved_contexts=contexts,
+        ))
+
+    return eval_samples
+
+
+def _llm_judge_scores(
+    client: "OllamaClient",
+    sample: EvalSample,
+    context: str,
+) -> dict[str, float]:
+    defaults = {
+        "faithfulness": 0.0,
+        "answer_relevancy": 0.0,
+        "context_precision": 0.0,
+        "context_recall": 0.0,
+        "answer_correctness": 0.0,
+    }
+
     try:
-        import re
-        raw = client.generate(prompt).strip()
-        match = re.search(r"\b([01](?:\.\d+)?)\b", raw)
-        if match:
-            return max(0.0, min(1.0, float(match.group(1))))
+        raw = client.generate(_judge_prompt(sample, context)).strip()
+        parsed = _parse_score_json(raw)
+        if isinstance(parsed, dict):
+            return {key: _clamp_score(parsed.get(key, 0.0)) for key in defaults}
     except Exception as exc:
         logger.warning("LLM judge call failed: %s", exc)
-    return 0.0
+    return defaults
 
 
-def _faithfulness_prompt(query: str, answer: str, context: str) -> str:
-    return f"""Rate whether every claim in the ANSWER is supported by the CONTEXT.
-Score: 1.0 = fully grounded, 0.0 = completely hallucinated. Decimals allowed.
-Respond with a single decimal number between 0.0 and 1.0.
+def _judge_prompt(sample: EvalSample, context: str) -> str:
+    return f"""You are grading a food RAG answer.
+Return ONLY valid JSON with these numeric keys:
+faithfulness, answer_relevancy, context_precision, context_recall, answer_correctness.
+Each value must be between 0.0 and 1.0.
 
-QUERY: {query}
-CONTEXT: {context[:2000]}
-ANSWER: {answer}
-SCORE:"""
+Definitions:
+- faithfulness: every answer claim is supported by the context.
+- answer_relevancy: the answer addresses the query.
+- context_precision: retrieved context is relevant to the query.
+- context_recall: context contains the ground truth information.
+- answer_correctness: answer is correct compared with the ground truth.
 
+QUERY: {sample.query}
+GROUND_TRUTH: {sample.ground_truth_answer}
+CONTEXT: {context[:2500]}
+ANSWER: {sample.generated_answer}
 
-def _relevancy_prompt(query: str, answer: str) -> str:
-    return f"""Rate how well the ANSWER addresses the QUERY.
-Score: 1.0 = perfectly addresses it, 0.0 = completely off-topic. Decimals allowed.
-Respond with a single decimal number between 0.0 and 1.0.
-
-QUERY: {query}
-ANSWER: {answer}
-SCORE:"""
-
-
-def _context_precision_prompt(query: str, context: str) -> str:
-    return f"""Rate what fraction of the retrieved CONTEXT is actually relevant to the QUERY.
-Score: 1.0 = all context is relevant, 0.0 = none is relevant. Decimals allowed.
-Respond with a single decimal number between 0.0 and 1.0.
-
-QUERY: {query}
-CONTEXT: {context[:2000]}
-SCORE:"""
+JSON:"""
 
 
-def _context_recall_prompt(ground_truth: str, context: str) -> str:
-    return f"""Rate how much of the GROUND TRUTH information is present in the CONTEXT.
-Score: 1.0 = all ground truth info is in context, 0.0 = none. Decimals allowed.
-Respond with a single decimal number between 0.0 and 1.0.
+def _parse_score_json(text: str) -> dict[str, Any] | None:
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        match = re.search(r"\{.*\}", text, flags=re.DOTALL)
+        if not match:
+            return None
+        try:
+            return json.loads(match.group(0))
+        except json.JSONDecodeError:
+            return None
 
-GROUND TRUTH: {ground_truth}
-CONTEXT: {context[:2000]}
-SCORE:"""
+
+def _clamp_score(value: Any) -> float:
+    try:
+        return max(0.0, min(1.0, float(value)))
+    except (TypeError, ValueError):
+        return 0.0
 
 
-def _correctness_prompt(query: str, answer: str, ground_truth: str) -> str:
-    return f"""Rate how correct and complete the ANSWER is compared to the GROUND TRUTH.
-Score: 1.0 = fully correct, 0.0 = completely wrong. Decimals allowed.
-Respond with a single decimal number between 0.0 and 1.0.
+def _sample_value(sample: Any, key: str, default: Any) -> Any:
+    if isinstance(sample, dict):
+        return sample.get(key, default)
+    return getattr(sample, key, default)
 
-QUERY: {query}
-GROUND TRUTH: {ground_truth}
-ANSWER: {answer}
-SCORE:"""
+
+def _eval_context(item: Any) -> str:
+    return "\n".join([
+        f"Name: {item.food_name}",
+        f"Cuisine: {item.cuisine_type}",
+        f"Calories: {item.calories}",
+        f"Description: {item.description}",
+        f"Ingredients: {item.ingredients}",
+        f"Nutrition: {item.nutrition}",
+        f"Health Benefits: {item.health_benefits}",
+        f"Taste Profile: {item.taste_profile}",
+        f"Cooking Method: {item.cooking_method}",
+    ])

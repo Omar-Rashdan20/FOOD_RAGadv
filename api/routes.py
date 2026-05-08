@@ -3,9 +3,7 @@ import time
 import logging
 from fastapi import APIRouter, HTTPException, status
 from .schemas import (CacheStatsResponse,EvalReportResponse,EvalSampleRequest,HealthResponse,RecommendRequest,RecommendResponse,)
-from src.evaluator import EvalSample, run_full_eval
-from src.filters import parse_query
-from src.query_transformer import QueryRoute, transform_query
+from src.evaluator import build_eval_samples, run_full_eval
 
 logger = logging.getLogger(__name__)
 
@@ -80,29 +78,6 @@ def run_eval(samples: list[EvalSampleRequest]):
     p = _pipeline()
 
 
-    eval_samples = []
-    for s in samples:
-        filters_obj = parse_query(s.query)
-        transformed = transform_query(s.query, p.gemini_client)
-
-        if transformed.route == QueryRoute.RETRIEVAL:
-            raw = p._retrieve_candidates(transformed, filters_obj, 10)
-            retrieved_ids = [str(r.get("food_id", "")) for r in raw]
-            contexts = [r.get("document", r.get("food_description", "")) for r in raw]
-        else:
-            retrieved_ids = []
-            contexts = []
-
-        answer = p.rag_recommend(s.query, n_results=10)
-
-        eval_samples.append(EvalSample(
-            query=s.query,
-            ground_truth_answer=s.ground_truth_answer,
-            relevant_doc_ids=s.relevant_doc_ids,
-            retrieved_doc_ids=retrieved_ids,
-            generated_answer=answer,
-            retrieved_contexts=contexts,
-        ))
-
-    report = run_full_eval(eval_samples, p.gemini_client)
+    eval_samples = build_eval_samples(p, samples, n_results=10)
+    report = run_full_eval(eval_samples, p.llm_client)
     return EvalReportResponse(**report.to_dict())

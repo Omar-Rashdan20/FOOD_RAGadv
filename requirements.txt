@@ -1,7 +1,6 @@
 chromadb
 sentence-transformers
 rank-bm25
-google-genai
 numpy
 scipy
 python-dotenv

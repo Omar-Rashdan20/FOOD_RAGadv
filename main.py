@@ -108,9 +108,7 @@ def _interactive(pipeline, top_k, use_cache, cache_stats) -> int:
 
 def _run_eval(pipeline, eval_file: str) -> int:
     try:
-        from src.evaluator import EvalSample, run_full_eval
-        from src.filters import parse_query
-        from src.query_transformer import QueryRoute, transform_query
+        from src.evaluator import build_eval_samples, run_full_eval
     except ImportError as exc:
         print(f"Eval import error: {exc}", file=sys.stderr)
         return 1
@@ -123,32 +121,8 @@ def _run_eval(pipeline, eval_file: str) -> int:
     with path.open() as f:
         raw_samples = json.load(f)
 
-    samples = []
-    for s in raw_samples:
-        query = s["query"]
-        filters_obj = parse_query(query)
-        transformed = transform_query(query, pipeline.gemini_client)
-
-        if transformed.route == QueryRoute.RETRIEVAL:
-            raw = pipeline._retrieve_candidates(transformed, filters_obj, 10)
-            retrieved_ids = [str(r.get("food_id", "")) for r in raw]
-            contexts = [r.get("document", r.get("food_description", "")) for r in raw]
-        else:
-            retrieved_ids = []
-            contexts = []
-
-        answer = pipeline.rag_recommend(query, n_results=10)
-
-        samples.append(EvalSample(
-            query=query,
-            ground_truth_answer=s.get("ground_truth_answer", ""),
-            relevant_doc_ids=s.get("relevant_doc_ids", []),
-            retrieved_doc_ids=retrieved_ids,
-            generated_answer=answer,
-            retrieved_contexts=contexts,
-        ))
-
-    report = run_full_eval(samples, pipeline.gemini_client)
+    samples = build_eval_samples(pipeline, raw_samples, n_results=10)
+    report = run_full_eval(samples, pipeline.llm_client)
     print(report.summary())
     return 0
 

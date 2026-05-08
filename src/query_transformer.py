@@ -7,7 +7,7 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .rag_pipeline import GeminiClient
+    from .rag_pipeline import OllamaClient
 
 logger = logging.getLogger(__name__)
 
@@ -23,48 +23,39 @@ class QueryRoute(str, Enum):
 class TransformedQuery:
     original: str
     variants: list[str]
-    hyde_passage: str | None
     stepback_query: str | None
     route: QueryRoute
 
 
 def transform_query(
     query: str,
-    gemini_client: "GeminiClient",
+    llm_client: "OllamaClient",
     *,
     n_variants: int = 4,
-    use_hyde: bool = True,
     use_stepback: bool = True,
 ) -> TransformedQuery:
-    route = _route_query(query, gemini_client)
+    route = _route_query(query, llm_client)
 
     if route != QueryRoute.RETRIEVAL:
         return TransformedQuery(
             original=query,
             variants=[query],
-            hyde_passage=None,
             stepback_query=None,
             route=route,
         )
 
-    variants = _multi_query(query, gemini_client, n_variants)
-    hyde_passage = _hyde(query, gemini_client) if use_hyde else None
-    stepback = _stepback(query, gemini_client) if use_stepback else None
-
-    all_variants: list[str] = list(variants)
-    if hyde_passage:
-        all_variants.append(hyde_passage)
+    variants = _multi_query(query, llm_client, n_variants)
+    stepback = _stepback(query, llm_client) if use_stepback else None
 
     return TransformedQuery(
         original=query,
-        variants=all_variants,
-        hyde_passage=hyde_passage,
+        variants=variants,
         stepback_query=stepback,
         route=route,
     )
 
 
-def _route_query(query: str, client: "GeminiClient") -> QueryRoute:
+def _route_query(query: str, client: "OllamaClient") -> QueryRoute:
     prompt = f"""You are a query router for a food recommendation system.
 Classify the user query into exactly ONE category:
 
@@ -88,7 +79,7 @@ Query: {query}"""
     return QueryRoute.RETRIEVAL
 
 
-def _multi_query(query: str, client: "GeminiClient", n: int) -> list[str]:
+def _multi_query(query: str, client: "OllamaClient", n: int) -> list[str]:
     prompt = f"""You are helping improve a food search engine.
 Generate {n - 1} alternative phrasings of the user's food query.
 Each variant should cover a different semantic angle or keyword perspective.
@@ -111,23 +102,7 @@ Original query: {query}"""
         return [query]
 
 
-def _hyde(query: str, client: "GeminiClient") -> str | None:
-    prompt = f"""Write a short, factual food description (2-3 sentences) that would perfectly
-answer this query. Focus on ingredients, cuisine style, and nutritional qualities.
-Be specific. Do not start with 'I' or 'Here is'.
-
-Query: {query}
-
-Hypothetical food description:"""
-
-    try:
-        return client.generate(prompt).strip()
-    except Exception as exc:
-        logger.warning("HyDE generation failed (%s)", exc)
-        return None
-
-
-def _stepback(query: str, client: "GeminiClient") -> str | None:
+def _stepback(query: str, client: "OllamaClient") -> str | None:
     prompt = f"""Given this food query, generate a broader, more general version
 that could help find relevant results even if the exact dish isn't available.
 Output only the broader query. No explanation.
