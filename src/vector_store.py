@@ -40,10 +40,15 @@ def create_collection(
 
 
 def build_document_text(food: dict[str, Any]) -> str:
+    if food.get("semantic_text"):
+        return str(food["semantic_text"])
+
     parts = [
         food.get("food_name", ""),
         food.get("food_description", ""),
         food.get("food_ingredients", ""),
+        " ".join(food.get("aliases", [])) if isinstance(food.get("aliases"), list) else "",
+        " ".join(food.get("tags", [])) if isinstance(food.get("tags"), list) else "",
         food.get("cuisine_type", ""),
         food.get("cooking_method", ""),
         food.get("taste_profile", ""),
@@ -86,7 +91,7 @@ def populate_collection(
 
 
 def _build_metadata(food: dict[str, Any]) -> dict[str, Any]:
-    return {
+    metadata = {
         "food_name": food.get("food_name", ""),
         "cuisine_type": food.get("cuisine_type", "Unknown"),
         "food_calories_per_serving": food.get("food_calories_per_serving", 0),
@@ -97,6 +102,13 @@ def _build_metadata(food: dict[str, Any]) -> dict[str, Any]:
         "food_nutritional_factors": food.get("nutrition_profile", ""),
         "food_health_benefits": food.get("food_health_benefits", ""),
     }
+    extra = food.get("metadata") if isinstance(food.get("metadata"), dict) else {}
+    for key, value in extra.items():
+        if isinstance(value, (str, int, float, bool)) and value is not None:
+            metadata[key] = value
+    if isinstance(food.get("tags"), list):
+        metadata["tags"] = ", ".join(str(tag) for tag in food["tags"])
+    return metadata
 
 
 def query_collection(
@@ -139,6 +151,7 @@ def format_results(raw: dict[str, Any]) -> list[dict[str, Any]]:
             "cooking_method": meta.get("cooking_method", ""),
             "cuisine_type": meta.get("cuisine_type", "Unknown"),
             "food_calories_per_serving": meta.get("food_calories_per_serving", 0),
+            "metadata": meta,
             "similarity_score": similarity,
             "distance": dist,
             "document": doc,
@@ -151,14 +164,37 @@ def build_where_filter(filters: QueryFilters) -> dict[str, Any] | None:
     conditions: list[dict[str, Any]] = []
 
     if filters.cuisine:
-        conditions.append({"cuisine_type": {"$eq": filters.cuisine}})
+        conditions.append({"$or": [
+            {"cuisine_type": {"$eq": filters.cuisine}},
+            {"category": {"$eq": filters.cuisine}},
+        ]})
     if filters.max_calories is not None:
         conditions.append({"food_calories_per_serving": {"$lte": filters.max_calories}})
     if filters.min_calories is not None:
         conditions.append({"food_calories_per_serving": {"$gte": filters.min_calories}})
+    for tag in filters.dietary_tags:
+        if tag in _METADATA_FILTER_TAGS:
+            conditions.append({tag: {"$eq": True}})
 
     if not conditions:
         return None
     if len(conditions) == 1:
         return conditions[0]
     return {"$and": conditions}
+
+
+_METADATA_FILTER_TAGS = {
+    "diabetic_friendly",
+    "heart_healthy",
+    "high_fiber",
+    "high_protein",
+    "iron_rich",
+    "keto_friendly",
+    "low_carb",
+    "low_fat",
+    "low_sodium",
+    "muscle_recovery",
+    "potassium_rich",
+    "vegan",
+    "vegetarian",
+}

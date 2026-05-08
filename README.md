@@ -48,6 +48,33 @@ ollama pull llama3.2:3b
 
 ---
 
+## USDA Preprocessing
+
+```bash
+python scripts/preprocess_usda_fooddata.py \
+  --input "C:/Users/96279/Downloads/FoodData_Central_foundation_food_json_2026-04-30/FoodData_Central_foundation_food_json_2026-04-30.json"
+```
+
+Outputs:
+
+- `data/FoodDataSet.json` - combined production RAG objects with `id`, `food_name`, `aliases`, `semantic_text`, `metadata`, and `tags`.
+
+The default `DATASET_PATH` points at `./data/FoodDataSet.json`.
+
+Example metadata filter:
+
+```python
+where = {
+    "$and": [
+        {"calories": {"$lte": 300}},
+        {"high_protein": {"$eq": True}},
+        {"low_sodium": {"$eq": True}},
+    ]
+}
+```
+
+---
+
 ## Running the API Server
 
 ```bash
