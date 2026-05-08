@@ -1,0 +1,10 @@
+chromadb
+sentence-transformers
+rank-bm25
+google-genai
+numpy
+scipy
+python-dotenv
+fastapi
+uvicorn[standard]
+pydantic>=2.0

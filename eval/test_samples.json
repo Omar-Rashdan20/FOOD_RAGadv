@@ -1,0 +1,102 @@
+[
+  {
+    "query": "vegan Indian food under 400 calories",
+    "ground_truth_answer": "Dal Tadka is a great choice — vegan, around 320 calories.",
+    "relevant_doc_ids": []
+  },
+  {
+    "query": "light Japanese dish with no gluten",
+    "ground_truth_answer": "Miso soup with tofu is light, gluten-free, and under 100 calories.",
+    "relevant_doc_ids": []
+  },
+  {
+    "query": "high protein Mexican food for muscle gain",
+    "ground_truth_answer": "Grilled chicken burrito bowl with black beans offers around 550 calories and 45g of protein.",
+    "relevant_doc_ids": []
+  },
+  {
+    "query": "spicy Thai noodles under 500 calories",
+    "ground_truth_answer": "Pad Thai with shrimp is around 450 calories with a balance of sweet, sour, and spicy flavors.",
+    "relevant_doc_ids": []
+  },
+  {
+    "query": "Italian vegetarian pasta no dairy",
+    "ground_truth_answer": "Pasta e Fagioli is a hearty Italian bean and pasta soup, dairy-free and around 380 calories.",
+    "relevant_doc_ids": []
+  },
+  {
+    "query": "gluten-free comfort food under 600 calories",
+    "ground_truth_answer": "Chicken and vegetable stir-fry with rice is gluten-free, comforting, and around 480 calories.",
+    "relevant_doc_ids": []
+  },
+  {
+    "query": "keto friendly breakfast under 300 calories",
+    "ground_truth_answer": "A two-egg omelette with spinach, cheese, and avocado is keto-friendly and around 280 calories.",
+    "relevant_doc_ids": []
+  },
+  {
+    "query": "Mediterranean salad no nuts high protein",
+    "ground_truth_answer": "Greek salad with grilled chicken and feta is nut-free, protein-rich, and around 350 calories.",
+    "relevant_doc_ids": []
+  },
+  {
+    "query": "Korean low carb dinner no soy",
+    "ground_truth_answer": "Bulgogi lettuce wraps with grilled beef and vegetables are low-carb and soy-free at around 300 calories.",
+    "relevant_doc_ids": []
+  },
+  {
+    "query": "light French appetizer under 200 calories",
+    "ground_truth_answer": "French onion soup without the bread crouton topping is light and around 150 calories.",
+    "relevant_doc_ids": []
+  },
+  {
+    "query": "paleo dinner with beef under 700 calories",
+    "ground_truth_answer": "Grass-fed beef steak with roasted sweet potato and steamed broccoli is paleo-friendly at around 620 calories.",
+    "relevant_doc_ids": []
+  },
+  {
+    "query": "Chinese vegetarian dish no gluten no soy",
+    "ground_truth_answer": "Steamed Chinese eggplant with garlic and sesame oil is vegetarian, gluten-free, and soy-free at around 180 calories.",
+    "relevant_doc_ids": []
+  },
+  {
+    "query": "refreshing summer salad under 250 calories",
+    "ground_truth_answer": "Watermelon and arugula salad with mint and lime dressing is refreshing and around 180 calories.",
+    "relevant_doc_ids": []
+  },
+  {
+    "query": "hearty American breakfast under 500 calories",
+    "ground_truth_answer": "Two scrambled eggs with turkey bacon and whole wheat toast is hearty and around 420 calories.",
+    "relevant_doc_ids": []
+  },
+  {
+    "query": "low calorie Indian snack under 150 calories",
+    "ground_truth_answer": "Masala roasted chickpeas are a crunchy, spiced Indian snack at around 130 calories per serving.",
+    "relevant_doc_ids": []
+  },
+  {
+    "query": "dairy free Thai curry under 500 calories",
+    "ground_truth_answer": "Thai green vegetable curry with coconut milk and jasmine rice is dairy-free and around 460 calories.",
+    "relevant_doc_ids": []
+  },
+  {
+    "query": "Greek high protein lunch no shellfish",
+    "ground_truth_answer": "Grilled lamb souvlaki with tzatziki and pita is high in protein, shellfish-free, and around 480 calories.",
+    "relevant_doc_ids": []
+  },
+  {
+    "query": "vegan dessert under 300 calories",
+    "ground_truth_answer": "Chia seed pudding made with almond milk and fresh berries is vegan and around 220 calories.",
+    "relevant_doc_ids": []
+  },
+  {
+    "query": "spicy Mexican soup no dairy",
+    "ground_truth_answer": "Chicken tortilla soup without sour cream or cheese is dairy-free, spicy, and around 350 calories.",
+    "relevant_doc_ids": []
+  },
+  {
+    "query": "Japanese high protein low fat meal",
+    "ground_truth_answer": "Grilled salmon with steamed edamame and miso soup is high protein, low fat, and around 420 calories.",
+    "relevant_doc_ids": []
+  }
+]

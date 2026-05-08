@@ -1,0 +1,33 @@
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass, field
+from functools import lru_cache
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+@dataclass
+class Settings:
+    google_api_key: str | None = field(default_factory=lambda: os.getenv("GOOGLE_API_KEY"))
+    gemini_model_name: str = field(default_factory=lambda: os.getenv("GEMINI_MODEL", "gemini-2.0-flash"))
+    embedding_model_name: str = field(default_factory=lambda: os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2"))
+    chroma_db_path: str = field(default_factory=lambda: os.getenv("CHROMA_DB_PATH", "./chroma_db"))
+    collection_name: str = field(default_factory=lambda: os.getenv("COLLECTION_NAME", "food_collection"))
+    dataset_path: str = field(default_factory=lambda: os.getenv("DATASET_PATH", "./data/FoodDataSet.json"))
+    default_n_results: int = field(default_factory=lambda: int(os.getenv("DEFAULT_N_RESULTS", "5")))
+    retrieval_multiplier: int = field(default_factory=lambda: int(os.getenv("RETRIEVAL_MULTIPLIER", "10")))
+    confidence_threshold: float = field(default_factory=lambda: float(os.getenv("CONFIDENCE_THRESHOLD", "0.0")))
+    max_output_tokens: int = field(default_factory=lambda: int(os.getenv("MAX_OUTPUT_TOKENS", "1024")))
+    temperature: float = field(default_factory=lambda: float(os.getenv("TEMPERATURE", "0.5")))
+    cache_ttl_seconds: int = field(default_factory=lambda: int(os.getenv("CACHE_TTL_SECONDS", "3600")))
+    batch_size: int = field(default_factory=lambda: int(os.getenv("BATCH_SIZE", "100")))
+    host: str = field(default_factory=lambda: os.getenv("HOST", "0.0.0.0"))
+    port: int = field(default_factory=lambda: int(os.getenv("PORT", "8000")))
+
+
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    return Settings()
