@@ -116,21 +116,6 @@ python main.py --cache-stats "italian under 500 cal"
 
 ---
 
-## Evaluation Targets
-
-| Metric            | Target |
-|-------------------|--------|
-| Recall@10         | ≥ 0.80 |
-| Precision@10      | ≥ 0.60 |
-| MRR               | ≥ 0.70 |
-| Hit Rate          | ≥ 0.90 |
-| Faithfulness      | ≥ 0.90 |
-| Answer Relevancy  | ≥ 0.85 |
-| Context Precision | ≥ 0.70 |
-| Context Recall    | ≥ 0.80 |
-| Answer Correctness| ≥ 0.70 |
-
----
 
 ## Architecture
 
