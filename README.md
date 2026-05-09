@@ -1,36 +1,37 @@
-# Food RAG — Production Hybrid RAG System
+# Food RAG - Production Hybrid RAG System
 
-A production-grade food recommendation API built on Advanced RAG principles: hybrid BM25 + vector search, cross-encoder reranking, MMR diversity, semantic caching, and a full RAGAS-style evaluation framework — all exposed via a FastAPI server.
+A production-grade food recommendation API built with hybrid BM25 + vector search, metadata filtering, cross-encoder reranking, semantic caching, and RAGAS-style evaluation. The system uses a local Ollama model for grounded answer generation and LLM-as-judge generation evaluation.
 
 ---
 
 ## Project Structure
 
-```
+```text
 food-rag/
-├── api/
-│   ├── app.py          # FastAPI app + lifespan
-│   ├── routes.py       # /health, /recommend, /eval
-│   └── schemas.py      # Pydantic request/response models
-├── src/
-│   ├── cache.py        # 3-layer semantic cache
-│   ├── config.py       # Settings from .env
-│   ├── data_loader.py  # Dataset loading + normalization
-│   ├── evaluator.py    # RAGAS-style eval metrics
-│   ├── filters.py      # NL query parser
-│   ├── hybrid_retriever.py  # BM25 + ChromaDB + RRF
-│   ├── query_transformer.py # Multi-query, step-back, routing
-│   ├── rag_pipeline.py # Pipeline orchestrator
-│   ├── reranker.py     # Cross-encoder + MMR
-│   ├── utils.py        # Shared helpers
-│   └── vector_store.py # ChromaDB interface
-├── eval/
-│   └── test_samples.json
-├── data/
-│   └── FoodDataSet.json   # (bring your own)
-├── main.py
-├── requirements.txt
-└── .env.example
+|-- api/
+|   |-- app.py          # FastAPI app + lifespan
+|   |-- routes.py       # /health, /recommend, /eval
+|   `-- schemas.py      # Pydantic request/response models
+|-- data/
+|   |-- FoodDataSet.json
+|   `-- eval_data/
+|       `-- test_samples_50.json
+|-- scripts/
+|   `-- preprocess_usda_fooddata.py
+|-- src/
+|   |-- cache.py        # Exact + semantic cache
+|   |-- config.py       # Settings from .env
+|   |-- data_loader.py  # Dataset loading + normalization
+|   |-- evaluator.py    # Retrieval + generation eval metrics
+|   |-- filters.py      # Nutrition/query filter parser
+|   |-- hybrid_retriever.py  # BM25 + ChromaDB + RRF
+|   |-- query_transformer.py # Router, multi-query, step-back
+|   |-- rag_pipeline.py # Pipeline orchestrator
+|   |-- reranker.py     # Cross-encoder + MMR
+|   `-- vector_store.py # ChromaDB interface
+|-- main.py
+|-- requirements.txt
+`-- .env.example
 ```
 
 ---
@@ -43,25 +44,256 @@ source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
 ollama pull llama3.2:3b
-# Make sure Ollama is running before starting the app.
+```
+
+Make sure Ollama is running before starting the API:
+
+```bash
+ollama serve
+```
+
+On Windows PowerShell, activate the environment with:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+---
+
+## Dataset
+
+The app expects the production dataset here by default:
+
+```text
+data/FoodDataSet.json
+```
+
+Default `.env` setting:
+
+```env
+DATASET_PATH=./data/FoodDataSet.json
+OLLAMA_BASE_URL=http://127.0.0.1:11434
+OLLAMA_MODEL=llama3.2:3b
+```
+
+Each food record should support RAG fields such as:
+
+```json
+{
+  "id": "2727567",
+  "food_name": "Chicken thigh",
+  "aliases": ["chicken thigh"],
+  "semantic_text": "Food Name: Chicken thigh...",
+  "metadata": {
+    "calories": 221,
+    "protein_g": 18.6,
+    "low_sodium": true,
+    "high_protein": true
+  },
+  "tags": ["high-protein", "low-sodium"]
+}
 ```
 
 ---
 
 ## USDA Preprocessing
 
+If you need to regenerate the dataset from a USDA-style JSON file:
+
 ```bash
-python scripts/preprocess_usda_fooddata.py \
-  --input "C:/Users/96279/Downloads/FoodData_Central_foundation_food_json_2026-04-30/FoodData_Central_foundation_food_json_2026-04-30.json"
+python scripts/preprocess_usda_fooddata.py --input "C:/path/to/FoodData_Central_foundation_food_json_2026-04-30.json"
 ```
 
-Outputs:
+Output:
 
-- `data/FoodDataSet.json` - combined production RAG objects with `id`, `food_name`, `aliases`, `semantic_text`, `metadata`, and `tags`.
+```text
+data/FoodDataSet.json
+```
 
-The default `DATASET_PATH` points at `./data/FoodDataSet.json`.
+The preprocessor normalizes food names, extracts nutrition fields, computes missing calories, generates nutrition tags, creates aliases, builds semantic text, and removes duplicates.
 
-Example metadata filter:
+---
+
+## Running The API
+
+```bash
+python main.py --serve
+```
+
+Or run directly with reload:
+
+```bash
+uvicorn api.app:app --host 0.0.0.0 --port 8000 --reload
+```
+
+Interactive docs:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+---
+
+## API Endpoints
+
+### `GET /health`
+
+Returns pipeline readiness and cache stats.
+
+### `POST /recommend`
+
+```json
+{
+  "query": "healthy food under 300 calories with low sodium",
+  "n_results": 5,
+  "use_cache": true
+}
+```
+
+Example query ideas:
+
+```json
+{
+  "query": "high protein low fat foods",
+  "n_results": 3,
+  "use_cache": true
+}
+```
+
+```json
+{
+  "query": "foods for muscle recovery",
+  "n_results": 3,
+  "use_cache": true
+}
+```
+
+### `DELETE /recommend/cache`
+
+Clears recommendation cache, semantic cache, and route cache.
+
+### `POST /eval`
+
+```json
+[
+  {
+    "query": "show me protein rich food for a post workout meal",
+    "ground_truth_answer": "Chicken thigh, pollock, and pine nuts are relevant high-protein options for post-workout recovery.",
+    "relevant_doc_ids": ["2727567", "333476", "2346392"]
+  }
+]
+```
+
+---
+
+## CLI Usage
+
+```bash
+# Single query
+python main.py "healthy food under 300 calories with low sodium"
+
+# Interactive mode
+python main.py
+
+# Rebuild ChromaDB index
+python main.py --rebuild-index "high protein low fat foods"
+
+# Disable cross-encoder for faster testing
+python main.py --no-cross-encoder "foods rich in potassium"
+
+# Run evaluation
+python main.py --eval data/eval_data/test_samples_50.json
+
+# Cache stats
+python main.py --cache-stats "low sodium healthy snacks"
+```
+
+---
+
+## Query Routing
+
+The router chooses one strategy per query:
+
+| Strategy | Used for |
+| --- | --- |
+| `NORMAL_RETRIEVAL` | Exact food names, direct ingredient searches, simple nutrition lookups |
+| `MULTI_QUERY` | Nutrition constraints, calorie filtering, diet searches, ingredient combinations |
+| `MULTI_QUERY_STEPBACK` | Goal-based or recommendation-style queries like muscle recovery or digestion |
+| `CLARIFICATION` | Queries too vague to retrieve reliably |
+| `REJECTION` | Non-food topics |
+
+Examples:
+
+```text
+apple pie calories -> NORMAL_RETRIEVAL
+healthy foods under 300 calories -> MULTI_QUERY
+foods for muscle recovery -> MULTI_QUERY_STEPBACK
+protein -> CLARIFICATION
+weather tomorrow -> REJECTION
+```
+
+---
+
+## Evaluation
+
+Retrieval metrics:
+
+- Recall@K
+- Precision@K
+- MRR
+- Hit Rate
+
+Generation metrics use LLM-as-judge:
+
+- Faithfulness
+- Answer relevancy
+- Context precision
+- Context recall
+- Answer correctness
+
+Run:
+
+```bash
+python main.py --eval data/eval_data/test_samples_50.json
+```
+
+---
+
+## Architecture
+
+```text
+POST /recommend
+      |
+      v
+Query Router
+      |
+      +--> CLARIFICATION / REJECTION
+      |
+      +--> NORMAL_RETRIEVAL
+      +--> MULTI_QUERY
+      +--> MULTI_QUERY_STEPBACK
+      |
+      v
+Hybrid Retrieval
+  - Dense: ChromaDB vector search
+  - Sparse: BM25 keyword search
+  - RRF fusion
+      |
+      v
+Cross-encoder Reranker + MMR Diversity
+      |
+      v
+Grounded Generation with Ollama llama3.2:3b
+      |
+      v
+Recommendation Cache + Semantic Cache + Route Cache
+```
+
+---
+
+## Metadata Filtering
+
+The dataset metadata is optimized for filtering:
 
 ```python
 where = {
@@ -73,106 +305,12 @@ where = {
 }
 ```
 
----
+Supported nutrition-aware searches include:
 
-## Running the API Server
-
-```bash
-# Via CLI flag
-python main.py --serve
-
-# Via uvicorn directly
-uvicorn api.app:app --host 0.0.0.0 --port 8000 --reload
-```
-
-Interactive docs available at `http://localhost:8000/docs`.
-
----
-
-## API Endpoints
-
-### `GET /health`
-Returns pipeline readiness and cache stats.
-
-### `POST /recommend`
-```json
-{
-  "query": "healthy Indian food under 400 calories, no nuts",
-  "n_results": 5,
-  "use_cache": true
-}
-```
-
-### `DELETE /recommend/cache`
-Clears both exact and semantic cache layers.
-
-### `POST /eval`
-```json
-[
-  {
-    "query": "vegan Indian food under 400 calories",
-    "ground_truth_answer": "Dal Tadka is a great choice.",
-    "relevant_doc_ids": ["food_042"]
-  }
-]
-```
-
----
-
-## CLI Usage
-
-```bash
-# Single query
-python main.py "spicy Thai noodles under 500 calories"
-
-# Interactive mode
-python main.py
-
-# Rebuild ChromaDB index
-python main.py --rebuild-index "healthy salad"
-
-# Disable cross-encoder (faster)
-python main.py --no-cross-encoder "light pasta"
-
-# Run evaluation
-python main.py --eval eval/test_samples.json
-
-# Cache stats
-python main.py --cache-stats "italian under 500 cal"
-```
-
----
-
-
-## Architecture
-
-```
-POST /recommend
-      │
-      ▼
-Query Router ──► CLARIFICATION / REJECTION / GENERATION
-      │
-      ▼
-Multi-Query Transform (4 variants + step-back)
-      │
-      ▼
-Hybrid Retrieval
-  ├── Dense: ChromaDB (cosine) × each variant
-  ├── Sparse: BM25 × each variant
-  └── RRF Fusion (k=60)
-      │
-      ▼
-Cross-encoder Reranker
-  ├── ms-marco-MiniLM-L-6-v2
-  ├── Metadata boost (cuisine, calories, dietary, mood)
-  ├── Allergen penalty
-  └── MMR diversity (λ=0.6)
-      │
-      ▼
-3-Layer Cache
-  ├── Layer 1: SHA-256 exact match
-  └── Layer 2: Cosine similarity ≥ 0.92
-      │
-      ▼
-Grounded Generation (Ollama llama3.2:3b)
-```
+- healthy food under 300 calories
+- high protein low fat foods
+- vegan foods rich in iron
+- foods rich in potassium
+- low sodium healthy snacks
+- diabetic-friendly foods
+- foods for muscle recovery
