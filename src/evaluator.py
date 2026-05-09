@@ -296,7 +296,11 @@ def build_eval_samples(
         retrieved_ids: list[str] = []
         contexts: list[str] = []
 
-        if transformed.route == QueryRoute.RETRIEVAL:
+        if transformed.route in {
+            QueryRoute.NORMAL_RETRIEVAL,
+            QueryRoute.MULTI_QUERY,
+            QueryRoute.MULTI_QUERY_STEPBACK,
+        }:
             raw_results = pipeline._retrieve_candidates(transformed, filters, n_results)
             food_results = [normalize_search_result(result) for result in raw_results]
             ranked = rerank_results(
@@ -321,11 +325,6 @@ def build_eval_samples(
                 "I'm a food recommendation assistant. "
                 "I can help you find dishes, recipes, and nutrition information. "
                 "Please ask me something food-related!"
-            )
-        else:
-            prompt = (
-                f"You are a knowledgeable food assistant. "
-                f"Answer this food-related question:\n\n{query}"
             )
 
         if transformed.route in {QueryRoute.CLARIFICATION, QueryRoute.REJECTION}:

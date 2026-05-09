@@ -141,12 +141,25 @@ class FoodRAGPipeline:
 
         route_cache_key = f"route:{clean_query.lower()}"
         cached_route = self.route_cache.get(route_cache_key) if use_cache else None
-        route = QueryRoute(cached_route) if cached_route else route_query(
-            clean_query,
-            self.llm_client,
-            request_id=request_id,
-        )
-        if use_cache and cached_route is None:
+        should_update_route_cache = cached_route is None
+        route: QueryRoute
+        if cached_route:
+            try:
+                route = QueryRoute(cached_route)
+            except ValueError:
+                should_update_route_cache = True
+                route = route_query(
+                    clean_query,
+                    self.llm_client,
+                    request_id=request_id,
+                )
+        else:
+            route = route_query(
+                clean_query,
+                self.llm_client,
+                request_id=request_id,
+            )
+        if use_cache and should_update_route_cache:
             self.route_cache.set(route_cache_key, route.value)
 
         transformed = transform_query(
@@ -169,16 +182,6 @@ class FoodRAGPipeline:
                 "I can help you find dishes, recipes, and nutrition information. "
                 "Please ask me something food-related!"
             )
-        if transformed.route == QueryRoute.GENERATION:
-            prompt = (
-                f"You are a knowledgeable food assistant. "
-                f"Answer this food-related question:\n\n{clean_query}"
-            )
-            try:
-                return self.llm_client.generate(prompt)
-            except Exception as exc:
-                logger.warning("Generation route failed request_id=%s: %s", request_id, exc)
-                return f"Generation error: {exc}"
 
         candidate_pool = self._retrieve_candidates(transformed, filters, result_count)
 

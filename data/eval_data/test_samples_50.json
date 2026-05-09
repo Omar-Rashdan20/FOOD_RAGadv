@@ -1,0 +1,617 @@
+[
+  {
+    "query": "show me protein rich food for a post workout meal",
+    "ground_truth_answer": "Egg, white, dried is a relevant high-protein option. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "323793"
+    ],
+    "expected_constraints": {
+      "high_protein": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "protein_recovery"
+  },
+  {
+    "query": "healthy food under 300 calories with low sodium",
+    "ground_truth_answer": "Garlic, raw is a relevant low-sodium food under 300 calories. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "1104647"
+    ],
+    "expected_constraints": {
+      "max_calories": 300,
+      "low_sodium": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "low_sodium_low_calorie"
+  },
+  {
+    "query": "foods rich in iron for better nutrition",
+    "ground_truth_answer": "Sorghum bran, white, unenriched, dry, raw is a relevant iron-rich food. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "2710839"
+    ],
+    "expected_constraints": {
+      "iron_rich": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "iron_rich"
+  },
+  {
+    "query": "foods rich in potassium for muscle recovery",
+    "ground_truth_answer": "Flour, soy, defatted is a relevant potassium-rich food. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "1104705"
+    ],
+    "expected_constraints": {
+      "potassium_rich": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "potassium_recovery"
+  },
+  {
+    "query": "vegan high fiber foods for digestion",
+    "ground_truth_answer": "Flour, coconut is a relevant vegan high-fiber food. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "2515382"
+    ],
+    "expected_constraints": {
+      "vegan": true,
+      "high_fiber": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "vegan_high_fiber"
+  },
+  {
+    "query": "diabetic friendly foods with balanced carbs",
+    "ground_truth_answer": "Nuts, almonds, whole, raw is a relevant diabetic-friendly food. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "2346393"
+    ],
+    "expected_constraints": {
+      "diabetic_friendly": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "diabetic_friendly"
+  },
+  {
+    "query": "low fat foods for a lighter diet",
+    "ground_truth_answer": "Flour, whole wheat, unenriched is a relevant low-fat food. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "790085"
+    ],
+    "expected_constraints": {
+      "low_fat": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "low_fat"
+  },
+  {
+    "query": "vegetarian foods with useful nutrients",
+    "ground_truth_answer": "Nectarines, raw is a relevant vegetarian food. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "327357"
+    ],
+    "expected_constraints": {
+      "vegetarian": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "vegetarian_nutrition"
+  },
+  {
+    "query": "very low calorie foods for weight management",
+    "ground_truth_answer": "Salted Roasted Lentil Snack is a relevant food under 150 calories. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "legacy_salty_30"
+    ],
+    "expected_constraints": {
+      "max_calories": 150,
+      "use_existing_dataset_only": true
+    },
+    "category": "very_low_calorie"
+  },
+  {
+    "query": "seafood options that provide protein",
+    "ground_truth_answer": "Anchovies, canned in olive oil, with salt, drained is a relevant protein-rich seafood food. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "2747652"
+    ],
+    "expected_constraints": {
+      "high_protein": true,
+      "category_contains": "fish",
+      "use_existing_dataset_only": true
+    },
+    "category": "seafood_protein"
+  },
+  {
+    "query": "show me protein rich food for a post workout meal",
+    "ground_truth_answer": "Egg, whole, dried is a relevant high-protein option. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "329490"
+    ],
+    "expected_constraints": {
+      "high_protein": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "protein_recovery"
+  },
+  {
+    "query": "healthy food under 300 calories with low sodium",
+    "ground_truth_answer": "Mushroom, enoki is a relevant low-sodium food under 300 calories. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "2003600"
+    ],
+    "expected_constraints": {
+      "max_calories": 300,
+      "low_sodium": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "low_sodium_low_calorie"
+  },
+  {
+    "query": "foods rich in iron for better nutrition",
+    "ground_truth_answer": "Flour, potato is a relevant iron-rich food. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "2261422"
+    ],
+    "expected_constraints": {
+      "iron_rich": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "iron_rich"
+  },
+  {
+    "query": "foods rich in potassium for muscle recovery",
+    "ground_truth_answer": "Flour, soy, full-fat is a relevant potassium-rich food. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "1104766"
+    ],
+    "expected_constraints": {
+      "potassium_rich": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "potassium_recovery"
+  },
+  {
+    "query": "vegan high fiber foods for digestion",
+    "ground_truth_answer": "Flaxseed, ground is a relevant vegan high-fiber food. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "2262075"
+    ],
+    "expected_constraints": {
+      "vegan": true,
+      "high_fiber": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "vegan_high_fiber"
+  },
+  {
+    "query": "diabetic friendly foods with balanced carbs",
+    "ground_truth_answer": "Beans, Dry, Light Red Kidney is a relevant diabetic-friendly food. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "747438"
+    ],
+    "expected_constraints": {
+      "diabetic_friendly": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "diabetic_friendly"
+  },
+  {
+    "query": "low fat foods for a lighter diet",
+    "ground_truth_answer": "Mushrooms, white button is a relevant low-fat food. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "1999629"
+    ],
+    "expected_constraints": {
+      "low_fat": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "low_fat"
+  },
+  {
+    "query": "vegetarian foods with useful nutrients",
+    "ground_truth_answer": "Grapes, red, seedless, raw is a relevant vegetarian food. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "2346412"
+    ],
+    "expected_constraints": {
+      "vegetarian": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "vegetarian_nutrition"
+  },
+  {
+    "query": "very low calorie foods for weight management",
+    "ground_truth_answer": "Plantains, underripe, raw is a relevant food under 150 calories. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "2710818"
+    ],
+    "expected_constraints": {
+      "max_calories": 150,
+      "use_existing_dataset_only": true
+    },
+    "category": "very_low_calorie"
+  },
+  {
+    "query": "seafood options that provide protein",
+    "ground_truth_answer": "Tuna, ahi or yellowfin, frozen, wild caught is a relevant protein-rich seafood food. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "2747673"
+    ],
+    "expected_constraints": {
+      "high_protein": true,
+      "category_contains": "fish",
+      "use_existing_dataset_only": true
+    },
+    "category": "seafood_protein"
+  },
+  {
+    "query": "show me protein rich food for a post workout meal",
+    "ground_truth_answer": "Pork, cured, bacon, cooked, restaurant is a relevant high-protein option. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "749420"
+    ],
+    "expected_constraints": {
+      "high_protein": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "protein_recovery"
+  },
+  {
+    "query": "healthy food under 300 calories with low sodium",
+    "ground_truth_answer": "Peppers, bell, orange, raw is a relevant low-sodium food under 300 calories. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "2258591"
+    ],
+    "expected_constraints": {
+      "max_calories": 300,
+      "low_sodium": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "low_sodium_low_calorie"
+  },
+  {
+    "query": "foods rich in iron for better nutrition",
+    "ground_truth_answer": "Egg, yolk, dried is a relevant iron-rich food. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "329716"
+    ],
+    "expected_constraints": {
+      "iron_rich": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "iron_rich"
+  },
+  {
+    "query": "foods rich in potassium for muscle recovery",
+    "ground_truth_answer": "Beans, Dry, Tan is a relevant potassium-rich food. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "747434"
+    ],
+    "expected_constraints": {
+      "potassium_rich": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "potassium_recovery"
+  },
+  {
+    "query": "vegan high fiber foods for digestion",
+    "ground_truth_answer": "Potatoes, russet, without skin, raw is a relevant vegan high-fiber food. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "2346401"
+    ],
+    "expected_constraints": {
+      "vegan": true,
+      "high_fiber": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "vegan_high_fiber"
+  },
+  {
+    "query": "diabetic friendly foods with balanced carbs",
+    "ground_truth_answer": "Almond butter, creamy is a relevant diabetic-friendly food. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "2262074"
+    ],
+    "expected_constraints": {
+      "diabetic_friendly": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "diabetic_friendly"
+  },
+  {
+    "query": "low fat foods for a lighter diet",
+    "ground_truth_answer": "Flour, 00 is a relevant low-fat food. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "2003586"
+    ],
+    "expected_constraints": {
+      "low_fat": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "low_fat"
+  },
+  {
+    "query": "vegetarian foods with useful nutrients",
+    "ground_truth_answer": "Sour Grape Lollipops is a relevant vegetarian food. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "legacy_sour_48"
+    ],
+    "expected_constraints": {
+      "vegetarian": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "vegetarian_nutrition"
+  },
+  {
+    "query": "very low calorie foods for weight management",
+    "ground_truth_answer": "Vinegar is a relevant food under 150 calories. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "legacy_sour_09"
+    ],
+    "expected_constraints": {
+      "max_calories": 150,
+      "use_existing_dataset_only": true
+    },
+    "category": "very_low_calorie"
+  },
+  {
+    "query": "seafood options that provide protein",
+    "ground_truth_answer": "Fish, salmon, sockeye, wild caught, raw is a relevant protein-rich seafood food. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "2684440"
+    ],
+    "expected_constraints": {
+      "high_protein": true,
+      "category_contains": "fish",
+      "use_existing_dataset_only": true
+    },
+    "category": "seafood_protein"
+  },
+  {
+    "query": "show me protein rich food for a post workout meal",
+    "ground_truth_answer": "Chicken Tikka Masala is a relevant high-protein option. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "legacy_curry_1"
+    ],
+    "expected_constraints": {
+      "high_protein": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "protein_recovery"
+  },
+  {
+    "query": "healthy food under 300 calories with low sodium",
+    "ground_truth_answer": "Mahi mahi, frozen, wild caught is a relevant low-sodium food under 300 calories. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "2747658"
+    ],
+    "expected_constraints": {
+      "max_calories": 300,
+      "low_sodium": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "low_sodium_low_calorie"
+  },
+  {
+    "query": "foods rich in iron for better nutrition",
+    "ground_truth_answer": "Seeds, pumpkin seeds (pepitas), raw is a relevant iron-rich food. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "2515380"
+    ],
+    "expected_constraints": {
+      "iron_rich": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "iron_rich"
+  },
+  {
+    "query": "foods rich in potassium for muscle recovery",
+    "ground_truth_answer": "Beans, Dry, Brown is a relevant potassium-rich food. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "747433"
+    ],
+    "expected_constraints": {
+      "potassium_rich": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "potassium_recovery"
+  },
+  {
+    "query": "vegan high fiber foods for digestion",
+    "ground_truth_answer": "Potatoes, red, without skin, raw is a relevant vegan high-fiber food. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "2346402"
+    ],
+    "expected_constraints": {
+      "vegan": true,
+      "high_fiber": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "vegan_high_fiber"
+  },
+  {
+    "query": "diabetic friendly foods with balanced carbs",
+    "ground_truth_answer": "Nuts, macadamia nuts, raw is a relevant diabetic-friendly food. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "2515378"
+    ],
+    "expected_constraints": {
+      "diabetic_friendly": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "diabetic_friendly"
+  },
+  {
+    "query": "low fat foods for a lighter diet",
+    "ground_truth_answer": "Squash, winter, acorn, raw is a relevant low-fat food. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "2685571"
+    ],
+    "expected_constraints": {
+      "low_fat": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "low_fat"
+  },
+  {
+    "query": "vegetarian foods with useful nutrients",
+    "ground_truth_answer": "Mango, Ataulfo, peeled, raw is a relevant vegetarian food. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "2710834"
+    ],
+    "expected_constraints": {
+      "vegetarian": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "vegetarian_nutrition"
+  },
+  {
+    "query": "very low calorie foods for weight management",
+    "ground_truth_answer": "Pears, raw, bartlett is a relevant food under 150 calories. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "746773"
+    ],
+    "expected_constraints": {
+      "max_calories": 150,
+      "use_existing_dataset_only": true
+    },
+    "category": "very_low_calorie"
+  },
+  {
+    "query": "seafood options that provide protein",
+    "ground_truth_answer": "Snapper, frozen, wild caught is a relevant protein-rich seafood food. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "2747669"
+    ],
+    "expected_constraints": {
+      "high_protein": true,
+      "category_contains": "fish",
+      "use_existing_dataset_only": true
+    },
+    "category": "seafood_protein"
+  },
+  {
+    "query": "show me protein rich food for a post workout meal",
+    "ground_truth_answer": "Chicken, broiler or fryers, breast, skinless, boneless, meat only, cooked, braised is a relevant high-protein option. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "331960"
+    ],
+    "expected_constraints": {
+      "high_protein": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "protein_recovery"
+  },
+  {
+    "query": "healthy food under 300 calories with low sodium",
+    "ground_truth_answer": "Peppers, bell, green, raw is a relevant low-sodium food under 300 calories. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "2258588"
+    ],
+    "expected_constraints": {
+      "max_calories": 300,
+      "low_sodium": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "low_sodium_low_calorie"
+  },
+  {
+    "query": "foods rich in iron for better nutrition",
+    "ground_truth_answer": "Flour, amaranth is a relevant iron-rich food. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "2512371"
+    ],
+    "expected_constraints": {
+      "iron_rich": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "iron_rich"
+  },
+  {
+    "query": "foods rich in potassium for muscle recovery",
+    "ground_truth_answer": "Beans, Dry, Red is a relevant potassium-rich food. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "747431"
+    ],
+    "expected_constraints": {
+      "potassium_rich": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "potassium_recovery"
+  },
+  {
+    "query": "vegan high fiber foods for digestion",
+    "ground_truth_answer": "Potatoes, gold, without skin, raw is a relevant vegan high-fiber food. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "2346403"
+    ],
+    "expected_constraints": {
+      "vegan": true,
+      "high_fiber": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "vegan_high_fiber"
+  },
+  {
+    "query": "diabetic friendly foods with balanced carbs",
+    "ground_truth_answer": "Beans, Dry, Pinto is a relevant diabetic-friendly food. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "747445"
+    ],
+    "expected_constraints": {
+      "diabetic_friendly": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "diabetic_friendly"
+  },
+  {
+    "query": "low fat foods for a lighter diet",
+    "ground_truth_answer": "Carrots, baby, raw is a relevant low-fat food. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "2258587"
+    ],
+    "expected_constraints": {
+      "low_fat": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "low_fat"
+  },
+  {
+    "query": "vegetarian foods with useful nutrients",
+    "ground_truth_answer": "Carrots, mature, raw is a relevant vegetarian food. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "2258586"
+    ],
+    "expected_constraints": {
+      "vegetarian": true,
+      "use_existing_dataset_only": true
+    },
+    "category": "vegetarian_nutrition"
+  },
+  {
+    "query": "very low calorie foods for weight management",
+    "ground_truth_answer": "Soy milk, unsweetened, plain, shelf stable is a relevant food under 150 calories. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "1999630"
+    ],
+    "expected_constraints": {
+      "max_calories": 150,
+      "use_existing_dataset_only": true
+    },
+    "category": "very_low_calorie"
+  },
+  {
+    "query": "seafood options that provide protein",
+    "ground_truth_answer": "Fish, salmon, Atlantic, farm raised, raw is a relevant protein-rich seafood food. The answer should recommend only foods supported by the retrieved dataset.",
+    "relevant_doc_ids": [
+      "2684441"
+    ],
+    "expected_constraints": {
+      "high_protein": true,
+      "category_contains": "fish",
+      "use_existing_dataset_only": true
+    },
+    "category": "seafood_protein"
+  }
+]
