@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+import hashlib
+import json
 from typing import Any
 
 from .filters import QueryFilters
@@ -65,11 +67,17 @@ def populate_collection(
     existing_ids = set(collection.get(include=[])["ids"])
 
     seen_ids: set[str] = set()
+    seen_content: set[str] = set()
     new_items: list[dict[str, Any]] = []
     for idx, f in enumerate(food_items):
         food_id = str(f["food_id"])
+        content_key = _content_key(f)
+        if content_key in seen_content:
+            logger.debug("Skipping duplicate food content: %s", food_id)
+            continue
+        seen_content.add(content_key)
         if food_id in existing_ids or food_id in seen_ids:
-            food_id = f"{food_id}_{idx}"
+            food_id = f"{food_id}_{content_key[:8]}"
             f = {**f, "food_id": food_id}
         seen_ids.add(food_id)
         if food_id not in existing_ids:
@@ -198,3 +206,14 @@ _METADATA_FILTER_TAGS = {
     "vegan",
     "vegetarian",
 }
+
+
+def _content_key(food: dict[str, Any]) -> str:
+    metadata = food.get("metadata") if isinstance(food.get("metadata"), dict) else {}
+    payload = {
+        "name": str(food.get("food_name", "")).strip().lower(),
+        "calories": food.get("food_calories_per_serving", metadata.get("calories", 0)),
+        "category": str(food.get("cuisine_type", metadata.get("category", ""))).strip().lower(),
+    }
+    raw = json.dumps(payload, sort_keys=True)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()

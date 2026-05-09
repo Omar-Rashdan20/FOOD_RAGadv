@@ -2,16 +2,18 @@ from __future__ import annotations
 
 import logging
 import json
+import time
 import urllib.error
 import urllib.request
+import uuid
 from typing import Any
 
-from .cache import HybridCache, make_cache_key
+from .cache import HybridCache, TTLCache, make_cache_key
 from .config import Settings, get_settings
 from .data_loader import load_food_data
 from .filters import QueryFilters, parse_query
 from .hybrid_retriever import BM25Index, hybrid_retrieve
-from .query_transformer import QueryRoute, TransformedQuery, transform_query
+from .query_transformer import QueryRoute, TransformedQuery, route_query, transform_query
 from .reranker import (
     CrossEncoderReranker,
     FoodResult,
@@ -37,12 +39,14 @@ class OllamaClient:
         max_output_tokens: int = 1024,
         temperature: float = 0.5,
         timeout_seconds: int = 120,
+        max_retries: int = 2,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.model_name = model_name
         self.max_output_tokens = max_output_tokens
         self.temperature = temperature
         self.timeout_seconds = timeout_seconds
+        self.max_retries = max(0, max_retries)
 
     def generate(self, prompt: str) -> str:
         payload = {
@@ -60,14 +64,22 @@ class OllamaClient:
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        try:
-            with urllib.request.urlopen(request, timeout=self.timeout_seconds) as response:
-                data = json.loads(response.read().decode("utf-8"))
-        except urllib.error.URLError as exc:
-            raise RuntimeError(
-                "Ollama request failed. Make sure Ollama is running at "
-                f"{self.base_url} and the model is available: ollama pull {self.model_name}"
-            ) from exc
+        last_exc: BaseException | None = None
+        for attempt in range(self.max_retries + 1):
+            try:
+                with urllib.request.urlopen(request, timeout=self.timeout_seconds) as response:
+                    data = json.loads(response.read().decode("utf-8"))
+                break
+            except urllib.error.URLError as exc:
+                last_exc = exc
+                if attempt >= self.max_retries:
+                    raise RuntimeError(
+                        "Ollama request failed. Make sure Ollama is running at "
+                        f"{self.base_url} and the model is available: ollama pull {self.model_name}"
+                    ) from exc
+                time.sleep(0.4 * (2 ** attempt))
+        else:
+            raise RuntimeError("Ollama request failed") from last_exc
 
         if data.get("error"):
             raise RuntimeError(f"Ollama error: {data['error']}")
@@ -90,13 +102,20 @@ class FoodRAGPipeline:
         self.cross_encoder = cross_encoder
         self.cache = cache
         self.settings = settings
+        self.route_cache = TTLCache(ttl_seconds=settings.cache_ttl_seconds)
+
+    def clear_caches(self) -> None:
+        self.cache.clear()
+        self.route_cache.clear()
 
     def rag_recommend(
         self,
         query: str,
         n_results: int | None = None,
         use_cache: bool = True,
+        request_id: str | None = None,
     ) -> str:
+        request_id = request_id or uuid.uuid4().hex[:12]
         clean_query = query.strip()
         if not clean_query:
             raise ValueError("Query must not be empty.")
@@ -108,13 +127,26 @@ class FoodRAGPipeline:
         if use_cache:
             cached = self.cache.get(cache_key, query=clean_query)
             if cached:
+                logger.info("Recommendation cache hit request_id=%s", request_id)
                 return cached
+
+        route_cache_key = f"route:{clean_query.lower()}"
+        cached_route = self.route_cache.get(route_cache_key) if use_cache else None
+        route = QueryRoute(cached_route) if cached_route else route_query(
+            clean_query,
+            self.llm_client,
+            request_id=request_id,
+        )
+        if use_cache and cached_route is None:
+            self.route_cache.set(route_cache_key, route.value)
 
         transformed = transform_query(
             clean_query,
             self.llm_client,
             n_variants=4,
             use_stepback=True,
+            initial_route=route,
+            request_id=request_id,
         )
 
         if transformed.route == QueryRoute.CLARIFICATION:
@@ -136,6 +168,7 @@ class FoodRAGPipeline:
             try:
                 return self.llm_client.generate(prompt)
             except Exception as exc:
+                logger.warning("Generation route failed request_id=%s: %s", request_id, exc)
                 return f"Generation error: {exc}"
 
         candidate_pool = self._retrieve_candidates(transformed, filters, result_count)
@@ -159,9 +192,10 @@ class FoodRAGPipeline:
         try:
             response = self.llm_client.generate(prompt)
         except Exception as exc:
+            logger.warning("Grounded generation failed request_id=%s: %s", request_id, exc)
             return f"Generation error: {exc}"
 
-        if use_cache:
+        if response and use_cache:
             self.cache.set(cache_key, query=clean_query, value=response)
 
         return response
@@ -244,10 +278,13 @@ Retrieved options:
 {context}
 
 Write a concise, grounded answer:
-- One sentence acknowledging the request.
-- Recommend 2-3 best matches with **Name** (Cuisine, calories) in bold.
-- Brief explanation of why each fits.
-- Mention any constraint that could NOT be fully satisfied.
+### Response format
+Respond only with a markdown bullet list.
+Use 2-3 bullets.
+Each bullet must start exactly like:
+- **Name** (Cuisine, calories): why it fits.
+If a constraint cannot be fully satisfied, add one final bullet:
+- **Note**: brief limitation.
 """
 
 
@@ -319,6 +356,7 @@ def build_pipeline(
         max_output_tokens=app_settings.max_output_tokens,
         temperature=app_settings.temperature,
         timeout_seconds=app_settings.ollama_timeout_seconds,
+        max_retries=app_settings.ollama_max_retries,
     )
 
     return FoodRAGPipeline(

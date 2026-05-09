@@ -48,24 +48,20 @@ class SemanticCache:
         self._ttl = ttl_seconds
         self._max_entries = max_entries
         self._entries: list[tuple[list[float], str, float]] = []
+        self._index: Any | None = None
+        self._index_entries: list[tuple[list[float], str, float]] = []
+        self._dirty_index = True
 
     def get(self, query: str) -> str | None:
         try:
             q_vec = self._embed(query)
             if q_vec is None:
                 return None
+            q_vec = _normalise(q_vec)
 
             now = time.time()
-            best_score = -1.0
-            best_response: str | None = None
-
-            for vec, response, ts in self._entries:
-                if now - ts > self._ttl:
-                    continue
-                score = _cosine(q_vec, vec)
-                if score > best_score:
-                    best_score = score
-                    best_response = response
+            self._prune(now)
+            best_score, best_response = self._nearest(q_vec)
 
             if best_score >= self._threshold and best_response is not None:
                 logger.debug("Semantic cache HIT (score=%.3f)", best_score)
@@ -79,9 +75,10 @@ class SemanticCache:
             vec = self._embed(query)
             if vec is None:
                 return
-            self._entries.append((vec, response, time.time()))
+            self._entries.append((_normalise(vec), response, time.time()))
             if len(self._entries) > self._max_entries:
                 self._entries = self._entries[-self._max_entries:]
+            self._dirty_index = True
         except Exception as exc:
             logger.warning("Semantic cache write error: %s", exc)
 
@@ -97,9 +94,52 @@ class SemanticCache:
 
     def clear(self) -> None:
         self._entries.clear()
+        self._index = None
+        self._index_entries = []
+        self._dirty_index = True
 
     def size(self) -> int:
         return len(self._entries)
+
+    def _prune(self, now: float) -> None:
+        fresh = [entry for entry in self._entries if now - entry[2] <= self._ttl]
+        if len(fresh) != len(self._entries):
+            self._entries = fresh
+            self._dirty_index = True
+
+    def _nearest(self, q_vec: list[float]) -> tuple[float, str | None]:
+        if not self._entries:
+            return -1.0, None
+        if self._build_index():
+            distance, idx = self._index.query(q_vec, k=1)
+            score = max(0.0, min(1.0, 1.0 - (float(distance) ** 2 / 2.0)))
+            return score, self._index_entries[int(idx)][1]
+
+        best_score = -1.0
+        best_response: str | None = None
+        for vec, response, _ts in self._entries:
+            score = _cosine(q_vec, vec)
+            if score > best_score:
+                best_score = score
+                best_response = response
+        return best_score, best_response
+
+    def _build_index(self) -> bool:
+        if not self._dirty_index and self._index is not None:
+            return True
+        try:
+            from scipy.spatial import KDTree
+            self._index_entries = list(self._entries)
+            vectors = [entry[0] for entry in self._index_entries]
+            self._index = KDTree(vectors)
+            self._dirty_index = False
+            return True
+        except Exception as exc:
+            logger.debug("Semantic cache KDTree disabled: %s", exc)
+            self._index = None
+            self._index_entries = []
+            self._dirty_index = False
+            return False
 
 
 class HybridCache:
@@ -171,4 +211,21 @@ def _cosine(a: list[float], b: list[float]) -> float:
         denom = np.linalg.norm(va) * np.linalg.norm(vb)
         return float(np.dot(va, vb) / denom) if denom > 0 else 0.0
     except Exception:
-        return 0.0
+        dot = sum(x * y for x, y in zip(a, b))
+        norm_a = sum(x * x for x in a) ** 0.5
+        norm_b = sum(y * y for y in b) ** 0.5
+        denom = norm_a * norm_b
+        return dot / denom if denom > 0 else 0.0
+
+
+def _normalise(vec: list[float]) -> list[float]:
+    try:
+        import numpy as np
+        arr = np.array(vec, dtype=float)
+        norm = np.linalg.norm(arr)
+        if norm <= 0:
+            return list(arr)
+        return list(arr / norm)
+    except Exception:
+        norm = sum(x * x for x in vec) ** 0.5
+        return [x / norm for x in vec] if norm > 0 else vec

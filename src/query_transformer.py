@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING
@@ -33,8 +34,10 @@ def transform_query(
     *,
     n_variants: int = 4,
     use_stepback: bool = True,
+    initial_route: QueryRoute | None = None,
+    request_id: str | None = None,
 ) -> TransformedQuery:
-    route = _route_query(query, llm_client)
+    route = initial_route or _route_query(query, llm_client, request_id=request_id)
 
     if route != QueryRoute.RETRIEVAL:
         return TransformedQuery(
@@ -44,8 +47,15 @@ def transform_query(
             route=route,
         )
 
-    variants = _multi_query(query, llm_client, n_variants)
-    stepback = _stepback(query, llm_client) if use_stepback else None
+    if use_stepback:
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            variants_future = executor.submit(_multi_query, query, llm_client, n_variants, request_id)
+            stepback_future = executor.submit(_stepback, query, llm_client, request_id)
+            variants = variants_future.result()
+            stepback = stepback_future.result()
+    else:
+        variants = _multi_query(query, llm_client, n_variants, request_id=request_id)
+        stepback = None
 
     return TransformedQuery(
         original=query,
@@ -55,7 +65,25 @@ def transform_query(
     )
 
 
-def _route_query(query: str, client: "OllamaClient") -> QueryRoute:
+def route_query(
+    query: str,
+    client: "OllamaClient",
+    *,
+    request_id: str | None = None,
+) -> QueryRoute:
+    return _route_query(query, client, request_id=request_id)
+
+
+def _route_query(
+    query: str,
+    client: "OllamaClient",
+    *,
+    request_id: str | None = None,
+) -> QueryRoute:
+    regex_route = _regex_route(query)
+    if regex_route is not None:
+        return regex_route
+
     prompt = f"""You are a query router for a food recommendation system.
 Classify the user query into exactly ONE category:
 
@@ -74,12 +102,17 @@ Query: {query}"""
             if route.value.upper() in raw:
                 return route
     except Exception as exc:
-        logger.warning("Router failed (%s), defaulting to RETRIEVAL", exc)
+        logger.warning("Router failed request_id=%s (%s), defaulting to RETRIEVAL", request_id, exc)
 
     return QueryRoute.RETRIEVAL
 
 
-def _multi_query(query: str, client: "OllamaClient", n: int) -> list[str]:
+def _multi_query(
+    query: str,
+    client: "OllamaClient",
+    n: int,
+    request_id: str | None = None,
+) -> list[str]:
     prompt = f"""You are helping improve a food search engine.
 Generate {n - 1} alternative phrasings of the user's food query.
 Each variant should cover a different semantic angle or keyword perspective.
@@ -98,11 +131,15 @@ Original query: {query}"""
                 unique.append(v)
         return unique[:n]
     except Exception as exc:
-        logger.warning("Multi-query generation failed (%s)", exc)
+        logger.warning("Multi-query generation failed request_id=%s (%s)", request_id, exc)
         return [query]
 
 
-def _stepback(query: str, client: "OllamaClient") -> str | None:
+def _stepback(
+    query: str,
+    client: "OllamaClient",
+    request_id: str | None = None,
+) -> str | None:
     prompt = f"""Given this food query, generate a broader, more general version
 that could help find relevant results even if the exact dish isn't available.
 Output only the broader query. No explanation.
@@ -113,7 +150,7 @@ Broader query:"""
     try:
         return client.generate(prompt).strip()
     except Exception as exc:
-        logger.warning("Step-back generation failed (%s)", exc)
+        logger.warning("Step-back generation failed request_id=%s (%s)", request_id, exc)
         return None
 
 
@@ -127,3 +164,23 @@ def _parse_numbered_list(text: str) -> list[str]:
         if cleaned:
             results.append(cleaned)
     return results
+
+
+def _regex_route(query: str) -> QueryRoute | None:
+    text = query.strip().lower()
+    if len(text.split()) <= 1 and not re.search(r"\b(food|meal|recipe|calorie|protein|fat|carb|fiber)\b", text):
+        return QueryRoute.CLARIFICATION
+
+    food_signals = (
+        "food", "meal", "recipe", "diet", "calorie", "protein", "fat", "carb",
+        "fiber", "sodium", "iron", "potassium", "vegan", "vegetarian", "keto",
+        "breakfast", "lunch", "dinner", "snack", "healthy",
+    )
+    obvious_non_food = (
+        "weather", "stock", "bitcoin", "football", "movie", "code", "python",
+        "javascript", "travel", "hotel", "car", "phone",
+    )
+    if any(term in text for term in obvious_non_food) and not any(term in text for term in food_signals):
+        return QueryRoute.REJECTION
+
+    return None

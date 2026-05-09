@@ -45,6 +45,9 @@ ANIMAL_TERMS = {
 
 def preprocess_usda_dataset(input_path: Path) -> list[dict[str, Any]]:
     raw = json.loads(input_path.read_text(encoding="utf-8"))
+    if _is_rag_dataset(raw):
+        return normalize_rag_dataset(raw)
+
     foods = raw.get("FoundationFoods", raw.get("foods", raw if isinstance(raw, list) else []))
 
     processed: list[dict[str, Any]] = []
@@ -85,6 +88,61 @@ def preprocess_usda_dataset(input_path: Path) -> list[dict[str, Any]]:
         })
 
     return processed
+
+
+def normalize_rag_dataset(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
+    seen: set[str] = set()
+
+    for idx, record in enumerate(records):
+        if not isinstance(record, dict):
+            continue
+
+        food_name = normalize_food_name(str(record.get("food_name", "")))
+        metadata = record.get("metadata") if isinstance(record.get("metadata"), dict) else {}
+        tags = [str(tag) for tag in record.get("tags", []) if tag]
+        aliases = [str(alias) for alias in record.get("aliases", []) if alias]
+
+        if not food_name:
+            continue
+        if food_name not in aliases:
+            aliases.insert(0, food_name)
+
+        record_id = str(record.get("id", metadata.get("food_id", idx)))
+        metadata = {
+            **metadata,
+            "food_id": str(metadata.get("food_id", record_id)),
+            "food_name_normalized": food_name.lower(),
+        }
+
+        for tag in tags:
+            metadata[tag.replace("-", "_")] = True
+
+        semantic_text = str(record.get("semantic_text", "")).strip()
+        if not semantic_text:
+            semantic_text = build_semantic_text(
+                food_name=food_name,
+                category=str(metadata.get("category", "Unknown")),
+                nutrients={key: _safe_float(metadata.get(key)) for key in NUTRIENT_ALIASES},
+                tags=tags,
+                aliases=aliases,
+            )
+
+        if record_id in seen:
+            record_id = f"{record_id}_{idx}"
+            metadata["food_id"] = record_id
+        seen.add(record_id)
+
+        normalized.append({
+            "id": record_id,
+            "food_name": food_name,
+            "aliases": sorted(set(aliases)),
+            "semantic_text": semantic_text,
+            "metadata": metadata,
+            "tags": tags,
+        })
+
+    return normalized
 
 
 def extract_nutrients(food: dict[str, Any]) -> dict[str, float | None]:
@@ -382,12 +440,25 @@ def _dedupe_key(
     return "|".join([normalized_name, category.lower(), *nutrient_bits])
 
 
+def _is_rag_dataset(raw: Any) -> bool:
+    if not isinstance(raw, list) or not raw:
+        return False
+    first = raw[0]
+    return isinstance(first, dict) and {"id", "food_name", "semantic_text", "metadata", "tags"}.issubset(first)
+
+
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Preprocess USDA Foundation Foods for Food RAG.")
-    parser.add_argument("--input", required=True, help="Path to USDA FoodData Central foundation JSON.")
-    parser.add_argument("--output", default="data/usda_foundation_food_rag.json")
-    parser.add_argument("--jsonl-output", default="data/usda_foundation_food_rag.jsonl")
-    parser.add_argument("--app-output", default="data/FoodDataSet.usda.json")
+    parser = argparse.ArgumentParser(description="Normalize the main Food RAG dataset JSON.")
+    parser.add_argument(
+        "--input",
+        default="data/FoodDataSet.json",
+        help="Path to an existing RAG dataset JSON or USDA Foundation Foods JSON.",
+    )
+    parser.add_argument(
+        "--output",
+        default="data/FoodDataSet.json",
+        help="Single normalized dataset output path used by the app.",
+    )
     return parser.parse_args()
 
 
@@ -395,12 +466,8 @@ def main() -> int:
     args = parse_args()
     records = preprocess_usda_dataset(Path(args.input))
     write_json(Path(args.output), records)
-    write_jsonl(Path(args.jsonl_output), records)
-    write_app_compatible_json(Path(args.app_output), records)
-    print(f"Processed {len(records)} foods")
-    print(f"RAG JSON: {args.output}")
-    print(f"RAG JSONL: {args.jsonl_output}")
-    print(f"App-compatible JSON: {args.app_output}")
+    print(f"Normalized {len(records)} foods")
+    print(f"Main dataset JSON: {args.output}")
     return 0
 
 

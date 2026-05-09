@@ -1,7 +1,7 @@
 from __future__ import annotations
 import time
 import logging
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 from .schemas import (CacheStatsResponse,EvalReportResponse,EvalSampleRequest,HealthResponse,RecommendRequest,RecommendResponse,)
 from src.evaluator import build_eval_samples, run_full_eval
 
@@ -41,7 +41,7 @@ def root():
 
 
 @recommend_router.post("", response_model=RecommendResponse)
-def recommend(body: RecommendRequest):
+def recommend(body: RecommendRequest, request: Request):
     p = _pipeline()
     start = time.monotonic()
 
@@ -50,6 +50,7 @@ def recommend(body: RecommendRequest):
             query=body.query,
             n_results=body.n_results,
             use_cache=body.use_cache,
+            request_id=getattr(request.state, "request_id", None),
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
@@ -67,7 +68,7 @@ def recommend(body: RecommendRequest):
 
 @recommend_router.delete("/cache", status_code=status.HTTP_204_NO_CONTENT)
 def clear_cache():
-    _pipeline().cache.clear()
+    _pipeline().clear_caches()
 
 
 @eval_router.post("", response_model=EvalReportResponse)

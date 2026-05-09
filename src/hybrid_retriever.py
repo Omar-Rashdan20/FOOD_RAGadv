@@ -37,7 +37,7 @@ def hybrid_retrieve(
         all_dense_lists.append(dense_results)
 
         if bm25_index is not None:
-            sparse_results = bm25_index.search(query, n_results=n_results * 3)
+            sparse_results = bm25_index.search(query, n_results=n_results * 3, filters=filters)
             all_sparse_lists.append(sparse_results)
 
     fused = _rrf_fuse(all_dense_lists)
@@ -94,7 +94,12 @@ class BM25Index:
         self._bm25 = BM25Okapi(self._tokenized)
         logger.info("BM25 index built with %d documents", len(food_items))
 
-    def search(self, query: str, n_results: int = 10) -> list[dict[str, Any]]:
+    def search(
+        self,
+        query: str,
+        n_results: int = 10,
+        filters: QueryFilters | None = None,
+    ) -> list[dict[str, Any]]:
         if self._bm25 is None or not self._docs:
             return []
 
@@ -105,7 +110,7 @@ class BM25Index:
             range(len(scores)),
             key=lambda i: scores[i],
             reverse=True,
-        )[:n_results]
+        )[:n_results * 3]
 
         results: list[dict[str, Any]] = []
         max_score = scores[top_indices[0]] if top_indices else 1.0
@@ -115,6 +120,8 @@ class BM25Index:
             if scores[idx] <= 0:
                 break
             doc = self._docs[idx]
+            if filters is not None and not _matches_filters(doc, filters):
+                continue
             normalised = round((scores[idx] / max_score) * 100.0, 2)
             results.append({
                 "food_id": str(doc.get("food_id", idx)),
@@ -127,10 +134,13 @@ class BM25Index:
                 "cooking_method": doc.get("cooking_method", ""),
                 "cuisine_type": doc.get("cuisine_type", "Unknown"),
                 "food_calories_per_serving": doc.get("food_calories_per_serving", 0),
+                "metadata": doc.get("metadata", {}),
                 "similarity_score": normalised,
                 "distance": 1.0 - (scores[idx] / max_score),
                 "document": doc.get("document", ""),
             })
+            if len(results) >= n_results:
+                break
 
         return results
 
@@ -150,3 +160,54 @@ def _doc_text(doc: dict[str, Any]) -> str:
         doc.get("taste_profile", ""),
     ]
     return " ".join(p for p in parts if p)
+
+
+def _matches_filters(doc: dict[str, Any], filters: QueryFilters) -> bool:
+    metadata = doc.get("metadata") if isinstance(doc.get("metadata"), dict) else {}
+    calories = _safe_float(
+        metadata.get("calories", doc.get("food_calories_per_serving"))
+    )
+
+    if filters.cuisine:
+        values = {
+            str(doc.get("cuisine_type", "")).lower(),
+            str(metadata.get("category", "")).lower(),
+        }
+        if filters.cuisine.lower() not in values:
+            return False
+    if filters.max_calories is not None and calories is not None and calories > filters.max_calories:
+        return False
+    if filters.min_calories is not None and calories is not None and calories < filters.min_calories:
+        return False
+
+    for tag in filters.dietary_tags:
+        if tag in _FILTER_TAGS and metadata.get(tag) is not True:
+            return False
+
+    return True
+
+
+def _safe_float(value: Any) -> float | None:
+    try:
+        if value is None:
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+_FILTER_TAGS = {
+    "diabetic_friendly",
+    "heart_healthy",
+    "high_fiber",
+    "high_protein",
+    "iron_rich",
+    "keto_friendly",
+    "low_carb",
+    "low_fat",
+    "low_sodium",
+    "muscle_recovery",
+    "potassium_rich",
+    "vegan",
+    "vegetarian",
+}

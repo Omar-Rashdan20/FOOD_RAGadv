@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
+import uuid
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -44,9 +45,12 @@ app.add_middleware(
 
 @app.middleware("http")
 async def add_latency_header(request: Request, call_next):
+    request_id = request.headers.get("X-Request-ID", uuid.uuid4().hex[:12])
+    request.state.request_id = request_id
     start = time.monotonic()
     response = await call_next(request)
     response.headers["X-Response-Time-Ms"] = str(round((time.monotonic() - start) * 1000))
+    response.headers["X-Request-ID"] = request_id
     return response
 
 

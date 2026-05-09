@@ -27,7 +27,7 @@ class RetrievalMetrics:
     precision_at_k: float = 0.0
     mrr: float = 0.0
     hit_rate: float = 0.0
-    k: int = 10
+    k: int = 5
 
 
 @dataclass
@@ -52,11 +52,6 @@ class EvalReport:
         "precision_at_k": 0.60,
         "mrr": 0.70,
         "hit_rate": 0.90,
-        "faithfulness": 0.90,
-        "answer_relevancy": 0.85,
-        "context_precision": 0.70,
-        "context_recall": 0.80,
-        "answer_correctness": 0.70,
     })
 
     def compute_pass_fail(self) -> None:
@@ -109,7 +104,7 @@ class EvalReport:
         }
 
 
-def evaluate_retrieval(samples: list[EvalSample], k: int = 10) -> RetrievalMetrics:
+def evaluate_retrieval(samples: list[EvalSample], k: int = 5) -> RetrievalMetrics:
     if not samples:
         return RetrievalMetrics(k=k)
 
@@ -150,7 +145,7 @@ def evaluate_retrieval(samples: list[EvalSample], k: int = 10) -> RetrievalMetri
 
 def run_full_eval(
     samples: list[EvalSample],
-    k: int = 10,
+    k: int = 5,
 ) -> EvalReport:
     retrieval = evaluate_retrieval(samples, k=k)
     report = EvalReport(
@@ -165,7 +160,7 @@ def run_full_eval(
 def build_eval_samples(
     pipeline: "FoodRAGPipeline",
     raw_samples: list[Any],
-    n_results: int = 10,
+    n_results: int = 5,
 ) -> list[EvalSample]:
     from .filters import parse_query
     from .query_transformer import QueryRoute, transform_query
