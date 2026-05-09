@@ -79,5 +79,5 @@ def run_eval(samples: list[EvalSampleRequest]):
 
 
     eval_samples = build_eval_samples(p, samples, n_results=10)
-    report = run_full_eval(eval_samples, p.llm_client)
+    report = run_full_eval(eval_samples)
     return EvalReportResponse(**report.to_dict())

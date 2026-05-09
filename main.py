@@ -122,7 +122,7 @@ def _run_eval(pipeline, eval_file: str) -> int:
         raw_samples = json.load(f)
 
     samples = build_eval_samples(pipeline, raw_samples, n_results=10)
-    report = run_full_eval(samples, pipeline.llm_client)
+    report = run_full_eval(samples)
     print(report.summary())
     return 0
 

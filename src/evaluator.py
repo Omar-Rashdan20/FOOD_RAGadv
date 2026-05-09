@@ -1,15 +1,12 @@
 from __future__ import annotations
 
 import logging
-import json
-import re
 import statistics
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from .rag_pipeline import FoodRAGPipeline
-    from .rag_pipeline import OllamaClient
 
 logger = logging.getLogger(__name__)
 
@@ -68,11 +65,6 @@ class EvalReport:
             "precision_at_k": self.retrieval.precision_at_k,
             "mrr": self.retrieval.mrr,
             "hit_rate": self.retrieval.hit_rate,
-            "faithfulness": self.generation.faithfulness,
-            "answer_relevancy": self.generation.answer_relevancy,
-            "context_precision": self.generation.context_precision,
-            "context_recall": self.generation.context_recall,
-            "answer_correctness": self.generation.answer_correctness,
         }
         self.passed_targets = [k for k, v in metrics.items() if v >= self.TARGETS[k]]
         self.failed_targets = [k for k, v in metrics.items() if v < self.TARGETS[k]]
@@ -88,11 +80,7 @@ class EvalReport:
             f"  Hit Rate:    {self.retrieval.hit_rate:.3f}  (target >= {self.TARGETS['hit_rate']})",
             "",
             "[ Generation ]",
-            f"  Faithfulness:      {self.generation.faithfulness:.3f}  (target >= {self.TARGETS['faithfulness']})",
-            f"  Answer Relevancy:  {self.generation.answer_relevancy:.3f}  (target >= {self.TARGETS['answer_relevancy']})",
-            f"  Context Precision: {self.generation.context_precision:.3f}  (target >= {self.TARGETS['context_precision']})",
-            f"  Context Recall:    {self.generation.context_recall:.3f}  (target >= {self.TARGETS['context_recall']})",
-            f"  Answer Correctness:{self.generation.answer_correctness:.3f}  (target >= {self.TARGETS['answer_correctness']})",
+            "  LLM-as-judge metrics disabled.",
             "",
             f"PASSED: {', '.join(self.passed_targets) or 'none'}",
             f"FAILED: {', '.join(self.failed_targets) or 'none'}",
@@ -160,51 +148,15 @@ def evaluate_retrieval(samples: list[EvalSample], k: int = 10) -> RetrievalMetri
     )
 
 
-def evaluate_generation(
-    samples: list[EvalSample],
-    llm_client: "OllamaClient",
-) -> GenerationMetrics:
-    if not samples:
-        return GenerationMetrics()
-
-    faithfulness_scores: list[float] = []
-    relevancy_scores: list[float] = []
-    ctx_precision_scores: list[float] = []
-    ctx_recall_scores: list[float] = []
-    correctness_scores: list[float] = []
-
-    for sample in samples:
-        context_text = "\n\n".join(sample.retrieved_contexts[:5])
-        scores = _llm_judge_scores(llm_client, sample, context_text)
-        faithfulness_scores.append(scores["faithfulness"])
-        relevancy_scores.append(scores["answer_relevancy"])
-        ctx_precision_scores.append(scores["context_precision"])
-        ctx_recall_scores.append(scores["context_recall"])
-        correctness_scores.append(scores["answer_correctness"])
-
-    def safe_mean(lst: list[float]) -> float:
-        return statistics.mean(lst) if lst else 0.0
-
-    return GenerationMetrics(
-        faithfulness=safe_mean(faithfulness_scores),
-        answer_relevancy=safe_mean(relevancy_scores),
-        context_precision=safe_mean(ctx_precision_scores),
-        context_recall=safe_mean(ctx_recall_scores),
-        answer_correctness=safe_mean(correctness_scores),
-    )
-
-
 def run_full_eval(
     samples: list[EvalSample],
-    llm_client: "OllamaClient",
     k: int = 10,
 ) -> EvalReport:
     retrieval = evaluate_retrieval(samples, k=k)
-    generation = evaluate_generation(samples, llm_client)
     report = EvalReport(
         n_samples=len(samples),
         retrieval=retrieval,
-        generation=generation,
+        generation=GenerationMetrics(),
     )
     report.compute_pass_fail()
     return report
@@ -287,70 +239,6 @@ def build_eval_samples(
         ))
 
     return eval_samples
-
-
-def _llm_judge_scores(
-    client: "OllamaClient",
-    sample: EvalSample,
-    context: str,
-) -> dict[str, float]:
-    defaults = {
-        "faithfulness": 0.0,
-        "answer_relevancy": 0.0,
-        "context_precision": 0.0,
-        "context_recall": 0.0,
-        "answer_correctness": 0.0,
-    }
-
-    try:
-        raw = client.generate(_judge_prompt(sample, context)).strip()
-        parsed = _parse_score_json(raw)
-        if isinstance(parsed, dict):
-            return {key: _clamp_score(parsed.get(key, 0.0)) for key in defaults}
-    except Exception as exc:
-        logger.warning("LLM judge call failed: %s", exc)
-    return defaults
-
-
-def _judge_prompt(sample: EvalSample, context: str) -> str:
-    return f"""You are grading a food RAG answer.
-Return ONLY valid JSON with these numeric keys:
-faithfulness, answer_relevancy, context_precision, context_recall, answer_correctness.
-Each value must be between 0.0 and 1.0.
-
-Definitions:
-- faithfulness: every answer claim is supported by the context.
-- answer_relevancy: the answer addresses the query.
-- context_precision: retrieved context is relevant to the query.
-- context_recall: context contains the ground truth information.
-- answer_correctness: answer is correct compared with the ground truth.
-
-QUERY: {sample.query}
-GROUND_TRUTH: {sample.ground_truth_answer}
-CONTEXT: {context[:2500]}
-ANSWER: {sample.generated_answer}
-
-JSON:"""
-
-
-def _parse_score_json(text: str) -> dict[str, Any] | None:
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        match = re.search(r"\{.*\}", text, flags=re.DOTALL)
-        if not match:
-            return None
-        try:
-            return json.loads(match.group(0))
-        except json.JSONDecodeError:
-            return None
-
-
-def _clamp_score(value: Any) -> float:
-    try:
-        return max(0.0, min(1.0, float(value)))
-    except (TypeError, ValueError):
-        return 0.0
 
 
 def _sample_value(sample: Any, key: str, default: Any) -> Any:
