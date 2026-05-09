@@ -194,6 +194,7 @@ class FoodRAGPipeline:
         except Exception as exc:
             logger.warning("Grounded generation failed request_id=%s: %s", request_id, exc)
             return f"Generation error: {exc}"
+        response = _clean_response(response, ranked, filters)
 
         if response and use_cache:
             self.cache.set(cache_key, query=clean_query, value=response)
@@ -262,7 +263,8 @@ Strict rules:
 - Recommend ONLY foods from the retrieved options below.
 - NEVER invent dishes or facts not present in the retrieved context.
 - Respect ALL cuisine, calorie, dietary, and allergen constraints.
-- If no option fully matches, say so honestly and offer the closest matches.
+- Do NOT say a calorie constraint is unmet when any recommended option is within the detected calorie range.
+- Add a limitation note ONLY when every recommended option violates a detected constraint.
 
 Example request: "light Italian pasta under 500 calories"
 Example response:
@@ -283,7 +285,8 @@ Respond only with a markdown bullet list.
 Use 2-3 bullets.
 Each bullet must start exactly like:
 - **Name** (Cuisine, calories): why it fits.
-If a constraint cannot be fully satisfied, add one final bullet:
+Do not combine multiple foods in one bullet with "or".
+If every recommended option violates a detected constraint, add one final bullet:
 - **Note**: brief limitation.
 """
 
@@ -305,6 +308,41 @@ def _format_filters(filters: QueryFilters) -> str:
     if filters.servings:
         parts.append(f"- Servings: {filters.servings}")
     return "\n".join(parts) if parts else "- None detected"
+
+
+def _clean_response(
+    response: str,
+    ranked: list[FoodResult],
+    filters: QueryFilters,
+) -> str:
+    if not response:
+        return response
+    if filters.max_calories is None:
+        return response
+    has_matching_calorie_option = any(
+        item.calories > 0 and item.calories <= filters.max_calories
+        for item in ranked
+    )
+    if not has_matching_calorie_option:
+        return response
+
+    cleaned_lines = []
+    for line in response.splitlines():
+        lower = line.lower()
+        is_bad_note = (
+            lower.lstrip().startswith("- **note**")
+            and "calorie" in lower
+            and any(phrase in lower for phrase in (
+                "no option",
+                "cannot",
+                "could not",
+                "not fully",
+                "does not fully",
+            ))
+        )
+        if not is_bad_note:
+            cleaned_lines.append(line)
+    return "\n".join(cleaned_lines).strip()
 
 
 def build_pipeline(
