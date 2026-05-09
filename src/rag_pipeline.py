@@ -48,16 +48,25 @@ class OllamaClient:
         self.timeout_seconds = timeout_seconds
         self.max_retries = max(0, max_retries)
 
-    def generate(self, prompt: str) -> str:
+    def generate(
+        self,
+        prompt: str,
+        *,
+        json_mode: bool = False,
+        max_output_tokens: int | None = None,
+        temperature: float | None = None,
+    ) -> str:
         payload = {
             "model": self.model_name,
             "prompt": prompt,
             "stream": False,
             "options": {
-                "temperature": self.temperature,
-                "num_predict": self.max_output_tokens,
+                "temperature": self.temperature if temperature is None else temperature,
+                "num_predict": max_output_tokens or self.max_output_tokens,
             },
         }
+        if json_mode:
+            payload["format"] = "json"
         request = urllib.request.Request(
             f"{self.base_url}/api/generate",
             data=json.dumps(payload).encode("utf-8"),
