@@ -6,7 +6,7 @@ A production-grade food recommendation API built with hybrid BM25 + vector searc
 
 # Demo:
 
- [Link](https://www.linkedin.com/posts/omar-rashdan-64a475282_ai-rag-llm-ugcPost-7458951337712472065-hF6C?utm_source=share&utm_medium=member_desktop&rcm=ACoAAETErFoBium0uFL-HSaG10fR0-6OHAO8NXU)
+ [Demo Link](https://www.linkedin.com/posts/omar-rashdan-64a475282_ai-rag-llm-ugcPost-7458951337712472065-hF6C?utm_source=share&utm_medium=member_desktop&rcm=ACoAAETErFoBium0uFL-HSaG10fR0-6OHAO8NXU)
  
 ---
 
